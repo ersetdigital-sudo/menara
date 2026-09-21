@@ -482,7 +482,7 @@ export default function PesananDashboard() {
 
   const handleLogout = async () => {
     await fetch("/api/pesanan/auth", { method: "DELETE" });
-    router.push("/pesanan/login");
+    router.push("/login");
   };
 
   return (

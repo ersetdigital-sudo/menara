@@ -10,14 +10,20 @@ export default async function PesananLayout({
   const headerList = await headers();
   const pathname = headerList.get("x-pathname") ?? "";
 
+  // `/pesanan/login` sudah jadi rute lama yang cuma me-redirect ke `/login`,
+  // tapi harus tetap dikecualikan dari cek cookie di bawah — kalau tidak,
+  // pengguna tanpa cookie akan terjebak redirect ke halaman itu sendiri.
   const isLoginPage = pathname === "/pesanan/login";
 
   if (!isLoginPage) {
     const cookieStore = await cookies();
     const token = cookieStore.get("pesanan_auth")?.value;
 
-    if (!token) {
-      redirect("/pesanan/login");
+    // Harus persis "true" — sama dengan cek di route handler & hasAdminAccess().
+    // Sebelumnya cuma `!token`, jadi nilai cookie apa pun (mis. "asdf") lolos
+    // di halaman tapi ditolak di API.
+    if (token !== "true") {
+      redirect("/login");
     }
   }
 
