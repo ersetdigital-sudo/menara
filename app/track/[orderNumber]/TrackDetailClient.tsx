@@ -2,12 +2,23 @@
 
 import { useState } from "react";
 import {
+  BadgeCheck,
   Check,
-  Clock,
   Circle,
-  Truck,
+  Clock,
+  Flame,
+  Flag,
+  Layers,
+  LayoutTemplate,
   MessageCircle,
   Package,
+  Palette,
+  Printer,
+  Scissors,
+  Shirt,
+  Sparkles,
+  Truck,
+  type LucideIcon,
 } from "lucide-react";
 import {
   ORDER_STATUS_LABELS,
@@ -23,24 +34,33 @@ import {
 import { buildWhatsAppLink } from "@/lib/wa";
 
 /**
- * Ikon per tahap. Kuncinya adalah slug dari ORDER_STATUS_LIST — versi lama
- * peta ini masih memakai slug 10 tahap (order_diterima, printing_sublimasi, …)
- * yang sudah tidak pernah muncul lagi, sehingga ikonnya tidak tampil sama sekali.
+ * Ikon per tahap — SVG (lucide), bukan emoji: emoji dirender berbeda-beda di
+ * tiap perangkat/OS, sedangkan SVG mengikuti warna teks dan ukuran di sekitarnya.
+ *
+ * Kuncinya slug dari ORDER_STATUS_LIST. Versi lama peta ini memakai slug 10
+ * tahap (order_diterima, printing_sublimasi, …) yang sudah tidak pernah muncul,
+ * sehingga ikonnya sebenarnya tidak pernah tampil.
  */
-const STATUS_ICONS: Record<string, string> = {
-  desain: "🎨",
-  layout: "📐",
-  profing_warna: "🎛️",
-  cetak_print: "🖨️",
-  press_transfer: "🔥",
-  potong_pola: "✂️",
-  jahit: "🪡",
-  finishing: "🔧",
-  quality_control: "✅",
-  packing: "📦",
-  kirim: "🚚",
-  selesai: "🏁",
+const STAGE_ICONS: Record<string, LucideIcon> = {
+  desain: Palette,
+  layout: LayoutTemplate,
+  profing_warna: Layers,
+  cetak_print: Printer,
+  press_transfer: Flame,
+  potong_pola: Scissors,
+  jahit: Shirt,
+  finishing: Sparkles,
+  quality_control: BadgeCheck,
+  packing: Package,
+  kirim: Truck,
+  selesai: Flag,
 };
+
+/** Ikon tahap; status tak dikenal memakai lingkaran netral. */
+function StageIcon({ status, className }: { status: string; className?: string }) {
+  const Icon = STAGE_ICONS[status] ?? Circle;
+  return <Icon className={className} aria-hidden="true" />;
+}
 
 const COURIER_LINKS: Record<string, string> = {
   JNE: "https://www.jne.co.id/tracking",
@@ -219,9 +239,7 @@ function OrderDetailView({
 
           {/* Current status */}
           <div className="flex items-center gap-3 p-md bg-primary/5 rounded-xl border border-primary/10 mb-4">
-            <span className="text-2xl">
-              {STATUS_ICONS[order.current_status] || "📋"}
-            </span>
+            <StageIcon status={order.current_status} className="w-6 h-6 text-primary" />
             <div>
               <p className="text-caption text-stone uppercase tracking-wider">
                 Status Saat Ini
@@ -356,7 +374,10 @@ function OrderDetailView({
                             : "text-stone"
                       }`}
                     >
-                      {STATUS_ICONS[status]}{" "}
+                      <StageIcon
+                        status={status}
+                        className="mr-1 inline-block w-4 h-4 align-text-bottom"
+                      />
                       {ORDER_STATUS_LABELS[status]}
                     </p>
                     {historyEntry ? (
