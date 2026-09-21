@@ -11,6 +11,7 @@ halaman (server component), komponen dashboard, dan API routes.
 | `order-status.ts` | **Satu sumber kebenaran** aturan "status → tahap → progress" jersey: `stepFromStatus`, `statusFromStep`, `progressPercentFromStatus`, `isOrderCompleted`, `nextStageLabel`, `STATUS_TO_STAGE`, `stageLabel`, normalisasi slug lama (`print` → `cetak_print`), `STAGE_BACKFILL_NOTES` |
 | `maklon-status.ts` | Hal yang sama untuk **6 tahap maklon**: `MAKLON_STAGES` (step + slug + label), `maklonStatusFromStep`, `maklonStepFromStatus`, `maklonProgress`, `isMaklonCompleted` |
 | `order-number.ts` | Generator nomor pesanan bersama jersey & maklon: `generateOrderNumber`, `jakartaDatePart`, `ORDER_NUMBER_REGEX`. Memakai CSPRNG, bukan `Math.random()` |
+| `format-date.ts` | **Satu-satunya** tempat format tanggal & jam, semuanya dipaksa zona `Asia/Jakarta`: `formatDateTimeID`, `formatShortDateTimeID`, `formatDateTimeWIB`, `formatNumericDateID`, `formatShortDateID`, `formatTimeID`, `dateKeyID` (kunci harian) dan `monthKeyID` (kunci bulanan untuk laporan) |
 | `queries-orders.ts` | Akses data order: `getOrderByTracking` (memverifikasi nomor HP sebelum mengembalikan data), `getAllOrders`, `getOrderById`, `stripWoPhoto` |
 
 Menambah atau mengubah tahap produksi: mulai dari `types.ts` (jersey) atau

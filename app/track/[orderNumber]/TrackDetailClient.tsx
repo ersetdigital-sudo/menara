@@ -32,6 +32,7 @@ import {
   progressPercentFromStatus,
 } from "@/lib/order-status";
 import { buildWhatsAppLink } from "@/lib/wa";
+import { formatDateTimeID } from "@/lib/format-date";
 
 /**
  * Ikon per tahap — SVG (lucide), bukan emoji: emoji dirender berbeda-beda di
@@ -71,15 +72,8 @@ const COURIER_LINKS: Record<string, string> = {
   Pos: "https://www.posindonesia.co.id/id/track-trace",
 };
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// Format tanggal & jam: lib/format-date.ts (zona Asia/Jakarta, bukan zona
+// perangkat customer).
 
 export function TrackDetailClient({ orderNumber }: { orderNumber: string }) {
   const [result, setResult] = useState<{
@@ -315,7 +309,7 @@ function OrderDetailView({
             )}
             <DetailRow
               label="Tanggal Order"
-              value={formatDate(order.created_at)}
+              value={formatDateTimeID(order.created_at)}
             />
           </div>
         </div>
@@ -383,7 +377,7 @@ function OrderDetailView({
                     {historyEntry ? (
                       <div className="mt-1">
                         <p className="text-caption text-stone">
-                          {formatDate(historyEntry.created_at)}
+                          {formatDateTimeID(historyEntry.created_at)}
                         </p>
                         {historyEntry.note && (
                           <p className="text-caption text-charcoal mt-0.5">

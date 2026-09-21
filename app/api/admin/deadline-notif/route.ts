@@ -5,6 +5,7 @@ import { getAppUrl } from "@/lib/app-url";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendFonnteMessage, normalizeAndValidatePhone } from "@/lib/fonnte";
 import { ORDER_STATUS_LABELS } from "@/lib/types";
+import { dateKeyID, formatLongDateID } from "@/lib/format-date";
 
 // Route ini mengirim WA berurutan ke beberapa admin; tanpa durasi eksplisit,
 // Vercel bisa mematikan function di tengah jalan (respons 500 "Gateway Timeout").
@@ -201,12 +202,7 @@ export async function GET(req: Request) {
 
     // Dedup per order: skip kalau sudah dinotif di tanggal WIB yang sama
     if (!fromDashboard && order.deadline_notified_at) {
-      const notifiedWibDate = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Jakarta",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date(order.deadline_notified_at));
+      const notifiedWibDate = dateKeyID(order.deadline_notified_at);
       if (notifiedWibDate === todayWib) {
         skippedOrders.push({ order: order.order_number, reason: "sudah_dinotif_hari_ini" });
         continue;
@@ -274,7 +270,7 @@ Nomor: ${order.order_number}
 Customer: ${order.customer_name}
 Produk: ${product} (${qty} pcs)
 Tahap: ${stageName} (${order.current_stage}/11)
-Deadline: ${new Date(order.deadline).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+Deadline: ${formatLongDateID(order.deadline)} (WIB)
 Sisa: ${order.diffDays === 0 ? "Hari ini" : order.diffDays + " hari lagi"}
 
 Segera tindak lanjuti.

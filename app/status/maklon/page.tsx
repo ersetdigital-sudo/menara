@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/server";
 import { verifyToken } from "@/lib/verify-token";
 import { MAKLON_STAGES, MAKLON_STEP_PROGRESS } from "@/lib/maklon-status";
+import { formatDateTimeWIB, formatShortDateID } from "@/lib/format-date";
 
 /**
  * Halaman tracking publik untuk pesanan MAKLON.
@@ -71,35 +72,10 @@ const SAFE_COLUMNS = [
   "updated_at",
 ].join(",");
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return "-";
-  const date = d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
-  const time = d.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-  });
-  return `${date}, ${time} WIB`;
-}
+// Format tanggal memakai lib/format-date.ts (zona Asia/Jakarta). Wrapper di
+// bawah hanya menambahkan tanda "-" untuk nilai kosong/tidak valid.
+const formatDate = (value: string | null | undefined) => formatShortDateID(value) || "-";
+const formatDateTime = (value: string | null | undefined) => formatDateTimeWIB(value) || "-";
 
 function photoUrls(value: unknown): string[] {
   if (!Array.isArray(value)) return [];

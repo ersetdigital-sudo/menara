@@ -3,6 +3,11 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { MAKLON_STAGES, maklonProgress } from "@/lib/maklon-status";
+import {
+  formatDateTimeWIB,
+  formatNumericDateID,
+  formatShortDateID,
+} from "@/lib/format-date";
 import { Search, AlertTriangle } from "lucide-react";
 
 // Optimasi delivery yang sama seperti upload design lama (f_auto,q_auto)
@@ -63,37 +68,14 @@ function statusOf(o: OrderData, totalSteps: number): FilterKey {
   return "produksi";
 }
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function formatDatePretty(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
+// Format tanggal & jam memakai lib/format-date.ts (zona Asia/Jakarta, selalu
+// sama di perangkat mana pun). Wrapper di bawah hanya menambahkan "-".
+const formatDate = (dateStr: string) => formatNumericDateID(dateStr) || "-";
+const formatDatePretty = (dateStr: string) => formatShortDateID(dateStr) || "-";
 
 /** Tanggal + jam (WIB) buat nunjukin kapan terakhir pesanan diupdate. */
 function formatDateTime(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  const date = d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
-  const time = d.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-  });
-  return `${date}, ${time} WIB`;
+  return formatDateTimeWIB(dateStr) || "-";
 }
 
 function initials(name: string) {
@@ -294,7 +276,7 @@ export default function MaklonDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden lg:inline text-[12.5px] text-[var(--pas-muted)]">
-                {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                {formatShortDateID(new Date())}
               </span>
               <button onClick={() => setShowAdd(true)} className="pas-btn-accent px-3.5 py-2.5 text-[14px] sm:px-4">
                 <span className="sm:inline">+ </span>Maklon

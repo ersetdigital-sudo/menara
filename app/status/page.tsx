@@ -17,36 +17,13 @@ import {
   stepFromStatus,
   TOTAL_STAGES,
 } from "@/lib/order-status";
+import { formatShortDateTimeID } from "@/lib/format-date";
 
 const CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 const SPIN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3.2-6.9"/></svg>';
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatShortDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatDateTime(dateStr: string) {
-  const d = new Date(dateStr);
-  const date = d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-  const time = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ".");
-  return `${date} • ${time} WIB`;
-}
+// Format tanggal & jam ada di lib/format-date.ts dan selalu memakai zona
+// Asia/Jakarta, jadi customer di WITA/WIT melihat jam yang sama dengan admin.
 
 /** Format jumlah (qty) dengan pemisah ribuan ala Indonesia: 1000 → 1.000 */
 function fmtQty(n: number): string {
@@ -532,7 +509,7 @@ function StatusContent() {
                 </span>
                 {order.deadline && (
                   <span className="dpo-meta">
-                    Target <span className="dpo-mono ml-1 text-[#e8ebe9]">{formatShortDate(order.deadline)}</span>
+                    Target <span className="dpo-mono ml-1 text-[#e8ebe9]">{formatShortDateTimeID(order.deadline)}</span>
                   </span>
                 )}
               </div>
@@ -551,7 +528,7 @@ function StatusContent() {
                     <p className="dpo-h2 text-[15px]">Tahap {step} <span className="text-[#6f757c]">/ {totalSteps}</span></p>
                     {lastUpdate && (
                       <p className="dpo-mono mt-1 text-[10.5px] leading-tight text-[#6f757c]">
-                        Update {formatShortDate(lastUpdate.created_at)}
+                        Update {formatShortDateTimeID(lastUpdate.created_at)}
                       </p>
                     )}
                   </div>
@@ -622,7 +599,7 @@ function StatusContent() {
                         </div>
                         <p className="dpo-step-desc">{stepDescription(statusKey, hasTracking)}</p>
                         {histEntry ? (
-                          <p className="dpo-mono dpo-step-time">{formatShortDate(histEntry.created_at)}</p>
+                          <p className="dpo-mono dpo-step-time">{formatShortDateTimeID(histEntry.created_at)}</p>
                         ) : st === "todo" && order.deadline ? (
                           <p className="dpo-mono dpo-step-time">Mengikuti jadwal produksi</p>
                         ) : null}

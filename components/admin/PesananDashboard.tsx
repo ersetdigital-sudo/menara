@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } fro
 import { useRouter } from "next/navigation";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_LIST, getProgress } from "@/lib/types";
+import {
+  dateKeyID,
+  formatDayMonthID,
+  formatDateTimeWIB,
+  formatNumericDateID,
+  formatShortDateID,
+  formatTimeID,
+  monthKeyID,
+} from "@/lib/format-date";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Search, AlertTriangle } from "lucide-react";
 
@@ -89,12 +98,8 @@ const MONTH_NAMES = [
 const CAT_ORDER = ["Atasan", "Setelan"];
 const CAT_COLORS = ["#0C0C0D", "#7FA37B", "#FFE500", "#8A8A8F"];
 
-/** "2026-09" dari created_at (waktu lokal browser). */
-function monthKeyOf(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+/** "2026-09" dari created_at, menurut zona Asia/Jakarta (bukan zona browser). */
+const monthKeyOf = (iso: string) => monthKeyID(iso);
 
 function monthLabelOf(key: string): string {
   const [y, m] = key.split("-");
@@ -267,36 +272,14 @@ function statusOf(o: OrderData, totalSteps: number): FilterKey {
   return "produksi";
 }
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function formatDatePretty(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
+// Format tanggal & jam memakai lib/format-date.ts (zona Asia/Jakarta, selalu
+// sama di perangkat mana pun). Wrapper di bawah hanya menambahkan "-".
+const formatDate = (dateStr: string) => formatNumericDateID(dateStr) || "-";
+const formatDatePretty = (dateStr: string) => formatShortDateID(dateStr) || "-";
 
 /** Tanggal + jam (WIB) buat nunjukin kapan terakhir pesanan diupdate. */
 function formatDateTime(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  const date = d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
-  const time = d.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-  });
-  return `${date}, ${time} WIB`;
+  return formatDateTimeWIB(dateStr) || "-";
 }
 
 function deadlineStatus(deadline: string | null, isDone: boolean): { level: "normal" | "approaching" | "warning" | "critical" | "overdue" | null; diffDays: number } {
@@ -572,11 +555,7 @@ export default function PesananDashboard() {
                 </svg>
               </button>
               <span className="hidden lg:inline text-[12.5px] text-[var(--pas-muted)]">
-                {new Date().toLocaleDateString("id-ID", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {formatShortDateID(new Date())}
               </span>
               {currentView === "pesanan" && (
                 <button
@@ -1926,9 +1905,13 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
     if (isNaN(y) || isNaN(m)) return [];
     const buckets = [0, 0, 0, 0, 0];
     monthOrders.forEach((o) => {
-      const d = new Date(o.created_at);
-      if (isNaN(d.getTime())) return;
-      buckets[Math.min(Math.floor((d.getDate() - 1) / 7), 4)] += 1;
+      // Tanggal diambil dari kunci WIB, bukan tanggal lokal perangkat — order
+      // jam 06.00 WIB tanggal 1 tidak boleh masuk keranjang minggu sebelumnya
+      // hanya karena perangkatnya berzona lain.
+      const key = dateKeyID(o.created_at);
+      if (!key) return;
+      const day = Number(key.slice(8, 10));
+      buckets[Math.min(Math.floor((day - 1) / 7), 4)] += 1;
     });
     return buckets
       .map((value, i) => ({ label: `W${i + 1}`, value }))
@@ -3511,8 +3494,8 @@ function ViewNotif({ showToast, orders }: { showToast: (msg: string) => void; or
                         )}
                       </td>
                       <td className="py-2.5 text-[13px]" style={{ color: "var(--ink-2)" }}>
-                        {new Date(log.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}{" "}
-                        {new Date(log.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                        {formatDayMonthID(log.created_at)}{" "}
+                        {formatTimeID(log.created_at)}
                       </td>
                       <td className="py-2.5 text-[13px] font-semibold" style={{ color: "var(--ink)", fontFamily: 'var(--font-geist-mono),monospace' }}>{log.order_number || "-"}</td>
                       <td className="py-2.5 text-[12px]" style={{ color: "var(--ink-soft)" }}>
