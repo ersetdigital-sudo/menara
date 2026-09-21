@@ -96,6 +96,21 @@ Format: `MNR` + `YYMMDD` + 4 digit urutan, contoh `MNR2609210001`.
 4. **Email admin** — `admin@menara.id` masih hardcoded di sidebar
    (`components/admin/*Dashboard.tsx`) dan halaman login.
 
+## Deployment
+
+| Item | Nilai |
+| --- | --- |
+| Repo | https://github.com/ersetdigital-sudo/menara |
+| Vercel project | `menara` (team suryas-projects-48d9ecd9) |
+| URL production | https://menara-three.vercel.app |
+| Framework preset | Next.js (dipatok lewat `vercel.json`) |
+
+Deploy ulang: `vercel deploy --prod` dari folder ini.
+
+> Preset framework wajib "Next.js". Kalau project Vercel dibuat lewat
+> `vercel project add` preset-nya jadi "Other", dan middleware akan di-emit
+> mentah sehingga SEMUA request balas 500 `MIDDLEWARE_INVOCATION_FAILED`.
+
 ## Screenshot
 
 Screenshot hasil verifikasi ada di `../_shots/` (dashboard desktop, mobile,
