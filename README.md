@@ -1,117 +1,189 @@
-# MENARA Admin Panel
+<div align="center">
 
-Panel operasional MENARA — versi "kembar" dari sistem TNT Sport Apparel, tapi
-pakai brand, warna, dan font MENARA. Fokus tahap ini: **core operasional**
-(dashboard Pesanan & Maklon, tracking customer, notifikasi WhatsApp otomatis,
-pengingat deadline).
+# MENARA
 
-Repo `tntsport` **tidak disentuh** — dia cuma dipakai sebagai referensi kode.
+**Production operations platform for a custom jersey manufacturer.**
+
+Order intake → 11-stage production pipeline → automated WhatsApp updates → customer tracking.
+
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres_%2B_RLS-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)](https://menara-three.vercel.app)
+
+[**Live demo**](https://menara-three.vercel.app) · [Customer tracking](https://menara-three.vercel.app/track)
+
+</div>
+
+---
+
+## The problem
+
+MENARA produces custom full-printing jerseys. Every order passes through eleven production stages across different workstations — design, layout, colour proofing, printing, press transfer, cutting, sewing, finishing, QC, packing, shipping.
+
+Before this platform, keeping customers informed meant someone pausing work to answer *"how far along is my order?"* on WhatsApp. Order status lived in the operator's head; the customer had no way to check it themselves.
+
+Three problems followed from that:
+
+- **No visibility.** Customers messaged repeatedly for updates that were already known internally.
+- **No accountability.** Nothing recorded when an order actually moved between stages, so a stalled order was invisible until the customer complained.
+- **No memory.** Deadlines were tracked verbally, and photo assets (design approvals, work orders) were scattered across shared chats.
+
+This platform turns that flow into a tracked, self-reporting pipeline: the moment an operator advances a stage, the system records the history, recalculates progress, and notifies the customer automatically.
+
+## What it does
+
+| Module | What it does |
+|---|---|
+| **Orders dashboard** | Create, search, edit and advance jersey orders through the 11-stage pipeline. Deadline tracking, design & work-order photo uploads, per-order production reports. |
+| **Maklon dashboard** | A separate 6-stage pipeline for toll-manufacturing (maklon) jobs, with its own numbering and stage set. |
+| **Automated WhatsApp updates** | Each genuine stage change sends a templated update to the customer via the Fonnte gateway — deduplicated so a stage can never notify twice. |
+| **Deadline reminders** | A scheduled job warns production staff about orders due in 3 / 2 / 1 days, configurable per installation. |
+| **Customer tracking** | Customers check progress themselves with order number + phone, or through a signed link sent over WhatsApp. No login, no phone call. |
+| **Reports** | Average production turnaround, derived from the recorded stage history rather than a manually maintained sheet. |
+| **Settings** | Shop profile, WhatsApp gateway token, reminder schedule and monthly capacity — all editable from the dashboard. |
+
+## Screenshots
+
+**Landing page**
+
+![Landing page](docs/screenshots/01-landing-page.png)
+
+**Orders dashboard**
+
+![Orders dashboard](docs/screenshots/03-orders-dashboard.png)
+
+<table>
+<tr>
+<td width="50%">
+
+**Maklon (toll manufacturing) dashboard**
+
+![Maklon dashboard](docs/screenshots/05-maklon-dashboard.png)
+
+</td>
+<td width="50%">
+
+**Customer tracking page**
+
+![Customer tracking](docs/screenshots/07-customer-tracking.png)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Customer status timeline**
+
+![Customer status](docs/screenshots/06-customer-status.png)
+
+</td>
+<td width="50%">
+
+**Mobile dashboard**
+
+![Mobile dashboard](docs/screenshots/04-orders-dashboard-mobile.png)
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary>Login screen</summary>
+
+![Login](docs/screenshots/02-login.png)
+
+</details>
+
+## Architecture
+
+A single Next.js App Router application. Server Components read data directly; mutations go through Route Handlers that own the authorisation check.
+
+```
+Browser
+  dashboards · tracking pages · public landing
+        │
+        ▼
+Next.js 15 (App Router) on Vercel
+  middleware.ts        session refresh, tags each request with its pathname
+  Server Components    read through the service client
+  Route Handlers       getAdminDb()   auth check FIRST, then service client
+                       tracking       phone match / signed token, then read
+                       cron           CRON_SECRET, then service client
+        │
+        ▼
+Supabase (Postgres)
+  operational tables   RLS enabled, zero anon policies — service role only
+  content tables       public read, no public write
+  RPCs                 atomic stage-claim for notifications
+        │
+        ├──▶ Fonnte (WhatsApp gateway)
+        ├──▶ Cloudinary (media)
+        └──▶ Meta Conversions API (ads)
+```
+
+### Data model
+
+The schema is built from 26 versioned SQL migrations (`0001` → `0027`), applied in order. The core of it:
+
+| Table | Holds |
+|---|---|
+| `orders` | Order number, customer, deadline, `current_status`, `current_stage`, photo assets, product line items |
+| `order_status_history` | Append-only record of every stage transition, with notes, photos and timestamps |
+| `maklon_orders` / `maklon_status_history` | The equivalent pair for toll-manufacturing jobs |
+| `production_steps` / `maklon_steps` | Operator-editable stage names, so the pipeline isn't hardcoded |
+| `notification_logs` | Every WhatsApp send attempt, with status and provider error |
+| `app_settings` | Encrypted gateway token, reminder schedule, capacity |
+
+## Engineering notes
+
+A few parts that were genuinely interesting to get right.
+
+**One source of truth for "what stage is this order at?".** `current_status` has 12 possible values but the pipeline only has 11 stages — `selesai` (completed) is a terminal order state, not a twelfth stage. The rule "completed = final stage = 100%" was originally re-implemented in four places, and each copy had its own missing guard. It now lives once in `lib/order-status.ts`, together with a normalisation map that transparently upgrades legacy slugs (`print`, `pres`, `potong`) from an earlier 9-stage pipeline. Old rows keep reading correctly without a data migration.
+
+**Stage notifications that cannot double-send.** Advancing a stage triggers a WhatsApp message, and the naive implementation races: two operators tapping at once, or a client retry, sends the customer the same update twice. `lib/fonnte.ts` instead calls an RPC (`claim_stage_notification`) that wins or loses on a unique `(order_id, stage)` constraint *before* any message is sent. A lost claim means another request already sent it. `last_notified_stage` is only written after the provider confirms success, so a failed send is retried rather than silently dropped.
+
+**Tracking links that don't leak.** A dashboard behind a shared password is fine for staff, but customers shouldn't need accounts. Jersey orders are verified by normalising both sides to digits before comparing the phone number. Messages sent over WhatsApp carry an HMAC-SHA256 signed token (30-day TTL) so the link works without re-typing an order number, while `/status`, `/track` and `/status/maklon` resolve independently and never expose one customer's data to another.
+
+**Photos without a media server.** Design approvals and work orders are uploaded straight from the browser to Cloudinary via an unsigned upload preset; only the resulting URLs are stored. A server-side fallback route handles cases the browser preset can't.
+
+**Order numbers that survive being read aloud.** `MENARA` + `YYMMDD` + four characters drawn from a CSPRNG, with the ambiguous characters `B I O L 0 1` removed from the alphabet. Uniqueness is checked against the database with retry, because customers read these numbers over the phone.
+
+**Ad attribution without double counting.** The Meta Conversions API relay mirrors browser pixel events with the same event ID, so Meta deduplicates them into a single counted conversion — raising match quality without inflating reported numbers.
+
+## Security model
+
+Worth calling out, because the first version of this app had a serious flaw that the rewrite fixed.
+
+**What was wrong.** The operational tables shipped with row-level security enabled but policies written as `USING (true)` for the `public` role. Because `NEXT_PUBLIC_SUPABASE_ANON_KEY` is embedded in the browser bundle by design, anyone who opened DevTools could read *every* customer record — names, phone numbers, cities — insert fabricated orders, or rewrite any order's status and tracking number by calling the REST API directly. The application never came into it. Public signup was also enabled, and content tables granted writes to any authenticated user.
+
+**What changed.**
+
+- **Authorisation moved to the server.** All 38 call sites that touch operational tables now use a service-role client created in exactly one place (`createServiceClient()`), used only from server code. The public anon key no longer has any access to customer data.
+- **A single guard, applied first.** `getAdminDb()` verifies the admin session and returns the service client only if it passes — so every handler begins with an explicit 401 path rather than trusting RLS to filter results.  It was added to 15 handler functions across 10 routes that previously had no authorisation check at all — including two that could rewrite an order's stage (and therefore message a customer) and one that could change the shop's WhatsApp number.
+- **The RLS hole was closed.** Migration `0027` removes the permissive policies from the four operational tables and both stage lists, verified by attempting an unauthenticated write against the live database and confirming it is rejected with a row-level security error.
+- **Public signup disabled**, neutralising the `authenticated`-role policies on content tables at once.
+- **Secrets stay encrypted.** The WhatsApp gateway token is stored AES-256-GCM encrypted (key from the environment, never in code), so a database dump alone doesn't expose the account.
+- **The remaining anon surface is only what has to be public:** the landing page content and stage-name lists, both read-only.
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Framework | Next.js 15 (App Router), React 19 | Server Components keep DB credentials and secrets off the client while still allowing rich dashboards |
+| Language | TypeScript, `strict` | The status/pipeline logic spans a dozen files; the compiler catches the drift |
+| Styling | Tailwind CSS 3 + Radix UI primitives | Design tokens live in CSS variables so the brand palette is themeable in one place |
+| Database | Supabase (Postgres) + RLS | Real relational constraints for order history, plus a first-party RPC path for atomic claims |
+| Media | Cloudinary | Direct-from-browser uploads, no media server to run |
+| Messaging | Fonnte (WhatsApp gateway) | Where the customers already are; no app install required |
+| Hosting | Vercel | Cron for reminders, plus edge middleware for session refresh |
 
 ## Status
 
-| Bagian | Status |
-| --- | --- |
-| Dashboard Pesanan (`/pesanan/orders`) | ✅ jalan |
-| Dashboard Maklon (`/pesanan/maklon`) | ✅ jalan |
-| Tracking customer (`/track`, `/status`, `/status/maklon`) | ✅ jalan |
-| Notifikasi WhatsApp otomatis per tahap produksi | ✅ jalan (butuh token Fonnte) |
-| Pengingat deadline (H-3/H-2/H-1) | ✅ jalan (butuh token Fonnte) |
-| Database Supabase | ✅ sudah di-migrate (23 tabel + RPC) |
-| Landing page katalog & CMS produk | ⛔ belum (di luar scope tahap ini) |
+Shipped to production and in daily operational use. The landing page and product catalogue modules are the next milestone.
 
-## Tampilan
+## Author
 
-Tampilan mengikuti mockup HTML MENARA (`../pages/index.html`):
-
-| Token | Nilai |
-| --- | --- |
-| Aksen | `#FFE500` (kuning) |
-| Sidebar | `#0C0C0D` (hitam) |
-| Background | `#F5F5F4` |
-| Kartu | `#FFFFFF` |
-| Garis | `#ECECEB` |
-| Teks | `#111113` / muted `#8A8A8F` |
-| Font | Inter (satu keluarga font, dipakai untuk semua teks) |
-
-Semua token dashboard ada di `app/globals.css` di blok `--pas-*` (cari
-`PESANAN ADMIN DASHBOARD`).
-
-## Setup lokal
-
-```bash
-pnpm install
-cp .env.local.example .env.local   # lalu isi nilainya
-pnpm dev                           # http://localhost:3000
-```
-
-### Environment variable
-
-Wajib: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`, `SETTINGS_ENCRYPTION_KEY`,
-`TRACK_SESSION_SECRET`, `PESANAN_PASSWORD`, `CRON_SECRET`.
-
-Opsional (dibutuhkan untuk fitur tertentu):
-
-- `CLOUDINARY_*` → upload foto desain & WO di dashboard.
-- `META_CAPI_ACCESS_TOKEN` → server-side event Meta.
-
-Token Fonnte **tidak** ditaruh di env: disimpan terenkripsi (AES-256-GCM) di
-tabel `app_settings` dan diisi dari menu **Pengaturan** di dashboard.
-
-## Database
-
-Project Supabase: `msvacyexhcjqepfbdrez` (region `ap-southeast-1`).
-
-Skema dibuat dari `supabase/migrations/*.sql` (26 berkas, dijalankan berurutan
-`0001` → `0026`). Kalau perlu membuat project baru, jalankan migrasi tersebut
-berurutan — jangan lompat, karena beberapa migrasi mengubah tabel dari migrasi
-sebelumnya.
-
-> ⚠️ `0013_orders_tracking.sql` dan `0023_notification_logs.sql` memakai
-> `DROP TABLE` sebelum membuat ulang. Aman saat DB kosong, **jangan** dijalankan
-> ulang di database yang sudah berisi data produksi.
-
-## Alur produksi
-
-11 tahap (satu sumber kebenaran di `lib/order-status.ts`):
-
-`desain → layout → profing_warna → cetak_print → press_transfer → potong_pola → jahit → finishing → quality_control → packing → kirim`
-
-Order maklon punya alur terpisah 6 tahap. Satu kali admin mengubah tahap,
-sistem otomatis mencatat riwayat, menghitung progres, dan mengirim WhatsApp ke
-customer (dedup lewat RPC `claim_stage_notification`).
-
-## Nomor order
-
-Format: `MNR` + `YYMMDD` + 4 digit urutan, contoh `MNR2609210001`.
-
-## Yang masih perlu diisi
-
-1. **Nomor WhatsApp MENARA** — masih placeholder `6281234567890`, ubah di tabel
-   `brand` (kolom `whatsapp_number`) atau lewat menu Pengaturan.
-2. **Kredensial Cloudinary** — belum diisi, jadi upload foto desain/WO belum
-   aktif.
-3. **Token Fonnte** — diisi di menu Pengaturan dashboard supaya notifikasi WA
-   dan pengingat deadline jalan.
-4. **Email admin** — `admin@menara.id` masih hardcoded di sidebar
-   (`components/admin/*Dashboard.tsx`) dan halaman login.
-
-## Deployment
-
-| Item | Nilai |
-| --- | --- |
-| Repo | https://github.com/ersetdigital-sudo/menara |
-| Vercel project | `menara` (team suryas-projects-48d9ecd9) |
-| URL production | https://menara-three.vercel.app |
-| Framework preset | Next.js (dipatok lewat `vercel.json`) |
-
-Deploy ulang: `vercel deploy --prod` dari folder ini.
-
-> Preset framework wajib "Next.js". Kalau project Vercel dibuat lewat
-> `vercel project add` preset-nya jadi "Other", dan middleware akan di-emit
-> mentah sehingga SEMUA request balas 500 `MIDDLEWARE_INVOCATION_FAILED`.
-
-## Screenshot
-
-Screenshot hasil verifikasi ada di `../_shots/` (dashboard desktop, mobile,
-maklon, halaman tracking, plus render mockup sebagai pembanding).
+Built by **Your Name** <!-- TODO: ganti dengan nama kamu --> · [GitHub](https://github.com/ersetdigital-sudo) · [Live demo](https://menara-three.vercel.app)
