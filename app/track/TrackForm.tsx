@@ -14,8 +14,11 @@ import { formatWhatsAppDisplay, waMeUrl } from "@/lib/wa";
  */
 export default function TrackForm({
   brand,
+  hours,
 }: {
   brand: { name: string; whatsapp_number: string };
+  /** Jam operasional dari menu Pengaturan (dulu teks tetap di footer). */
+  hours: string;
 }) {
   const router = useRouter();
   const [orderNumber, setOrderNumber] = useState("");
@@ -272,7 +275,7 @@ export default function TrackForm({
                 </p>
               </div>
               <div className="flex flex-col sm:items-end gap-1 text-[13px] text-[#6b7280]">
-                <span>Senin–Sabtu · 09.00–17.00 WIB</span>
+                <span>{hours}</span>
                 <a
                   href={waHref}
                   className="text-[#FFE500] hover:underline underline-offset-4"

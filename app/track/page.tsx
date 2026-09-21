@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getBrand } from "@/lib/queries";
+import { getBrand, getOperationalHours } from "@/lib/queries";
 import TrackForm from "./TrackForm";
 
 export const metadata: Metadata = {
@@ -13,11 +13,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function TrackPage() {
-  const brand = await getBrand();
+  const [brand, hours] = await Promise.all([getBrand(), getOperationalHours()]);
 
   return (
     <TrackForm
       brand={{ name: brand.name, whatsapp_number: brand.whatsappNumber }}
+      hours={hours}
     />
   );
 }

@@ -18,6 +18,14 @@ import type { Brand } from "@/lib/types";
  */
 export const WA_NUMBER = "628115491117";
 
+/**
+ * Jam operasional cadangan untuk halaman publik (home & tracking).
+ * Nilai sebenarnya diatur di menu Pengaturan → Profil Toko
+ * (`app_settings.jam_operasional`); ini cuma jaring pengaman kalau database
+ * tidak terjangkau atau barisnya belum diisi.
+ */
+export const JAM_OPERASIONAL = "Senin–Sabtu · 09.00–17.00 WIB";
+
 export const brand: Brand = {
   name: "MENARA",
   monogram: "MENARA",

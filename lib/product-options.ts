@@ -53,6 +53,24 @@ export function mergeProductOptions(
 }
 
 /**
+ * Keluarga produk — istilah baku order jersey: "Setelan" = atasan + celana,
+ * "Atasan" = jersey saja.
+ *
+ * Nama bebas yang tidak menyebut keduanya (mis. nama desain "Jersey Home")
+ * TIDAK dipaksa masuk salah satu: mengembalikan `null` supaya total pcs tetap
+ * utuh tanpa tebakan yang bisa diam-diam salah.
+ *
+ * Dipakai laporan Penjualan per Produk di dashboard DAN bagian produk di
+ * halaman depan, jadi keduanya tidak bisa ketinggalan saat daftarnya berubah.
+ */
+export function productFamily(name: string): "Atasan" | "Setelan" | null {
+  const n = name.toLowerCase();
+  if (n.includes("setelan")) return "Setelan";
+  if (n.includes("atasan")) return "Atasan";
+  return null;
+}
+
+/**
  * Catat produk baru supaya muncul di pengisian berikutnya.
  * Mengembalikan daftar opsi terbaru (bawaan + tersimpan) untuk dipasang ke state.
  */

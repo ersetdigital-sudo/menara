@@ -16,6 +16,7 @@ import {
 import {
   DEFAULT_PRODUCTS,
   mergeProductOptions,
+  productFamily,
   rememberProducts,
 } from "@/lib/product-options";
 import { waNote } from "@/lib/notif-note";
@@ -160,22 +161,6 @@ function bucketOrder(o: OrderData): Record<string, number> {
 /** Label produk untuk laporan; nama kosong tetap dihitung, tidak dibuang. */
 function productLabel(name: string | null | undefined): string {
   return (name || "").trim() || "Tanpa nama produk";
-}
-
-/**
- * Keluarga produk — istilah baku order jersey: "Setelan" = atasan + celana,
- * "Atasan" = jersey saja (lihat daftar harga konveksi jersey, yang memakai
- * heading ATASAN/SETELAN × LENGAN PENDEK/PANJANG).
- *
- * Nama bebas yang tidak menyebut keduanya (mis. "Jersey Home") TIDAK dipaksa
- * masuk salah satu — dihitung sebagai "Lainnya" supaya total tetap utuh dan
- * tebakannya tidak diam-diam salah.
- */
-function productFamily(name: string): "Atasan" | "Setelan" | null {
-  const n = name.toLowerCase();
-  if (n.includes("setelan")) return "Setelan";
-  if (n.includes("atasan")) return "Atasan";
-  return null;
 }
 
 /* ── Customer: identitas berdasarkan nomor HP ──────────────────────────── */

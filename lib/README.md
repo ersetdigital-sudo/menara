@@ -13,7 +13,7 @@ halaman (server component), komponen dashboard, dan API routes.
 | `order-number.ts` | Generator nomor pesanan bersama jersey & maklon: `generateOrderNumber`, `jakartaDatePart`, `ORDER_NUMBER_REGEX`. Memakai CSPRNG, bukan `Math.random()` |
 | `format-date.ts` | **Satu-satunya** tempat format tanggal & jam, semuanya dipaksa zona `Asia/Jakarta`: `formatDateTimeID`, `formatShortDateTimeID`, `formatDateTimeWIB`, `formatNumericDateID`, `formatShortDateID`, `formatTimeID`, `dateKeyID` (kunci harian) dan `monthKeyID` (kunci bulanan untuk laporan) |
 | `queries-orders.ts` | Akses data order: `getOrderByTracking` (memverifikasi nomor HP sebelum mengembalikan data), `getAllOrders`, `getOrderById`, `stripWoPhoto` |
-| `product-options.ts` | Daftar pilihan produk form Pesanan & Maklon: `DEFAULT_PRODUCTS`, `mergeProductOptions(extra)`, `rememberProducts(names)`. Produk custom disimpan di `localStorage` (per perangkat), jadi form **wajib** memberi `extra` = nama produk order yang sedang dibuka |
+| `product-options.ts` | Daftar pilihan produk form Pesanan & Maklon: `DEFAULT_PRODUCTS`, `mergeProductOptions(extra)`, `rememberProducts(names)`, plus `productFamily(name)` (Atasan / Setelan / null) yang dipakai laporan *Penjualan per Produk* dan bagian produk di beranda. Produk custom disimpan di `localStorage` (per perangkat), jadi form **wajib** memberi `extra` = nama produk order yang sedang dibuka |
 
 Menambah atau mengubah tahap produksi: mulai dari `types.ts` (jersey) atau
 `maklon-status.ts` (maklon). Nama tahap di pesan WhatsApp, halaman `/status`, dan daftar
@@ -38,8 +38,8 @@ Anti-duplikat notifikasi tidak dicek di kode, tapi di database: RPC
 
 | File | Isi |
 | --- | --- |
-| `queries.ts` | Akses data publik server-side: `getBrand()` (identitas toko untuk halaman tracking), jatuh ke data statis kalau database tidak bisa dihubungi |
-| `data.ts` | Data fallback statis untuk identitas toko |
+| `queries.ts` | Akses data publik server-side: `getBrand()` (identitas toko untuk beranda & halaman tracking) dan `getOperationalHours()` (jam operasional dari `app_settings`), keduanya jatuh ke data statis kalau database tidak bisa dihubungi |
+| `data.ts` | Data fallback statis untuk identitas toko: `brand`, `WA_NUMBER`, `JAM_OPERASIONAL` |
 | `app-url.ts` | `getAppUrl()` — domain aplikasi untuk link tracking & notifikasi. Membaca `APP_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → `VERCEL_URL` → `localhost`, jadi tidak ada domain yang di-hardcode |
 
 ## Supabase, auth, dan media

@@ -11,7 +11,12 @@
  * lib/data.ts kalau database tidak terjangkau atau barisnya tidak ada —
  * supaya halaman publik tidak ikut mati saat database bermasalah.
  */
-import { createClient, supabaseConfigured } from "@/lib/supabase/server";
+import {
+  createClient,
+  createServiceClient,
+  serviceRoleConfigured,
+  supabaseConfigured,
+} from "@/lib/supabase/server";
 import * as fallback from "@/lib/data";
 import type { Brand, DbBrand } from "@/lib/types";
 
@@ -36,4 +41,31 @@ export async function getBrand(): Promise<Brand> {
     whatsappNumber: row.whatsapp_number,
     logoPath: row.logo_path,
   };
+}
+
+/**
+ * Jam operasional toko dari `app_settings` (kunci `jam_operasional`), dengan
+ * cadangan lib/data.ts kalau belum diisi atau database tidak terjangkau.
+ *
+ * Dipakai halaman publik (beranda & tracking) supaya teksnya ikut berubah saat
+ * admin mengubahnya di menu Pengaturan — dulu jam ini ditulis langsung di
+ * halaman tracking, jadi nilai di database dan yang tampil bisa berbeda.
+ *
+ * Kenapa service role: policy RLS `app_settings` sengaja tidak dibuka untuk
+ * anon — tabel yang sama juga menyimpan token Fonnte (walau terenkripsi),
+ * sehingga tabelnya tidak boleh dibaca publik. Yang dibaca di sini cuma satu
+ * kunci, dan hasilnya memang untuk ditampilkan.
+ */
+export async function getOperationalHours(): Promise<string> {
+  if (!serviceRoleConfigured()) return fallback.JAM_OPERASIONAL;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "jam_operasional")
+    .maybeSingle();
+
+  if (error || !data?.value?.trim()) return fallback.JAM_OPERASIONAL;
+  return data.value;
 }
