@@ -5,6 +5,7 @@ import { verifyToken } from "@/lib/verify-token";
 import { MAKLON_STAGES, MAKLON_STEP_PROGRESS } from "@/lib/maklon-status";
 import { formatDateTimeWIB, formatShortDateID } from "@/lib/format-date";
 import { WA_NUMBER } from "@/lib/data";
+import { waMeUrl } from "@/lib/wa";
 
 /**
  * Halaman tracking publik untuk pesanan MAKLON.
@@ -229,12 +230,14 @@ export default async function MaklonStatusPage({
   const authorized = !!session && !!orderNumber && session.orderId === orderNumber;
 
   const brand = await loadBrand();
-  // Nomor dari pengaturan brand formatnya lokal (08...), wa.me butuh kode negara.
-  const rawPhone = (brand.whatsapp_number || BRAND_FALLBACK.whatsapp_number).replace(/[^0-9]/g, "");
-  const waPhone = rawPhone.startsWith("0") ? `62${rawPhone.slice(1)}` : rawPhone;
-  const csHref = `https://wa.me/${waPhone}?text=${encodeURIComponent(
-    `Halo ${brand.name}, saya mau tanya progres pesanan maklon saya${orderNumber ? ` (${orderNumber})` : ""}.`
-  )}`;
+  // Nomor dari pengaturan brand formatnya lokal (08...); konversi ke format
+  // internasional ada di lib/wa.ts, bukan disalin di sini.
+  const csHref = waMeUrl(
+    brand.whatsapp_number || BRAND_FALLBACK.whatsapp_number,
+    `Halo ${brand.name}, saya mau tanya progres pesanan maklon saya${
+      orderNumber ? ` (${orderNumber})` : ""
+    }.`
+  );
 
   const result = authorized ? await loadMaklonOrder(orderNumber) : null;
 

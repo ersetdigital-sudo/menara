@@ -30,3 +30,32 @@ export function buildWhatsAppLink(phone: string, text: string): string {
   const normalized = normalizeWhatsAppNumber(phone);
   return `https://api.whatsapp.com/send?phone=${normalized}&text=${encodeURIComponent(text)}`;
 }
+
+/**
+ * Link `wa.me` siap pakai (dipakai halaman tracking & tombol CS).
+ *
+ * Nomor mentah dari tabel `brand` boleh berformat lokal (0812…) — konversi ke
+ * format internasional ditangani di satu tempat ini, supaya tidak ada lagi
+ * salinan logika "0 → 62" yang tersebar di tiap halaman.
+ */
+export function waMeUrl(phone: string, text?: string): string {
+  const normalized = normalizeWhatsAppNumber(phone);
+  const query = text ? `?text=${encodeURIComponent(text)}` : "";
+  return `https://wa.me/${normalized}${query}`;
+}
+
+/**
+ * Nomor untuk DITAMPILKAN ke customer: format lokal berkelompok.
+ *
+ * Diambil dari nilai yang sama dengan yang dipakai link WA, jadi teks di
+ * footer tidak bisa lagi tertinggal saat nomor di menu Pengaturan diganti
+ * (dulu footer menulis "WhatsApp: 0811-5491-117" sebagai teks mati).
+ *
+ *   628115491117 → 0811-5491-117
+ *   085194154165 → 0851-9415-4165
+ */
+export function formatWhatsAppDisplay(phone: string): string {
+  const intl = normalizeWhatsAppNumber(phone);
+  const local = intl.startsWith("62") ? "0" + intl.slice(2) : intl;
+  return (local.match(/\d{1,4}/g) || [local]).join("-");
+}

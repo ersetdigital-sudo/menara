@@ -11,9 +11,10 @@ import type { Brand } from "@/lib/types";
 /**
  * Nomor WhatsApp resmi MENARA — satu-satunya tempat nomor cadangan ditulis.
  *
- * Dipakai halaman tracking, `/api/brand`, dan `wa.ts` saat nilai dari tabel
- * `brand` belum/tidak terbaca. Nomor yang tampil saat normal tetap dari tabel
- * `brand` (menu Pengaturan admin), jadi mengganti nomor tidak perlu deploy.
+ * Dipakai halaman tracking & pesan WhatsApp saat nilai dari tabel `brand`
+ * belum/tidak terbaca (database tidak terjangkau). Nomor yang tampil saat
+ * normal tetap dari tabel `brand` (menu Pengaturan admin) lewat `getBrand()
+ * di lib/queries.ts, jadi mengganti nomor tidak perlu deploy.
  */
 export const WA_NUMBER = "628115491117";
 

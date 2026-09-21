@@ -31,9 +31,8 @@ import {
   nextStageLabel,
   progressPercentFromStatus,
 } from "@/lib/order-status";
-import { buildWhatsAppLink } from "@/lib/wa";
+import { waMeUrl } from "@/lib/wa";
 import { formatDateTimeID } from "@/lib/format-date";
-import { WA_NUMBER } from "@/lib/data";
 
 /**
  * Ikon per tahap — SVG (lucide), bukan emoji: emoji dirender berbeda-beda di
@@ -76,7 +75,16 @@ const COURIER_LINKS: Record<string, string> = {
 // Format tanggal & jam: lib/format-date.ts (zona Asia/Jakarta, bukan zona
 // perangkat customer).
 
-export function TrackDetailClient({ orderNumber }: { orderNumber: string }) {
+/** Identitas toko dari menu Pengaturan (dibaca server-side, dikirim sebagai prop). */
+type BrandInfo = { name: string; whatsapp_number: string };
+
+export function TrackDetailClient({
+  orderNumber,
+  brand,
+}: {
+  orderNumber: string;
+  brand: BrandInfo;
+}) {
   const [result, setResult] = useState<{
     order: any;
     history: any[];
@@ -120,6 +128,7 @@ export function TrackDetailClient({ orderNumber }: { orderNumber: string }) {
         order={result.order}
         history={result.history}
         orderNumber={orderNumber}
+        brand={brand}
       />
     );
   }
@@ -182,16 +191,18 @@ function OrderDetailView({
   order,
   history,
   orderNumber,
+  brand,
 }: {
   order: any;
   history: any[];
   orderNumber: string;
+  brand: BrandInfo;
 }) {
   const progress = progressPercentFromStatus(order.current_status);
   const nextEstimate = nextStageLabel(order.current_status);
-  const waLink = buildWhatsAppLink(
-    WA_NUMBER,
-    `Halo MENARA, saya mau tanya soal pesanan ${orderNumber}`
+  const waLink = waMeUrl(
+    brand.whatsapp_number,
+    `Halo ${brand.name}, saya mau tanya soal pesanan ${orderNumber}`
   );
   const courierLink =
     COURIER_LINKS[order.courier] ||
