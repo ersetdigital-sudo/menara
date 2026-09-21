@@ -74,15 +74,16 @@ function normalizeStepName(name: string): string {
  * Tahap ke berapa untuk sebuah current_status.
  * Aturan "selesai" = tahap akhir & status tak dikenal = tahap 1 ada di
  * lib/order-status.ts (`isOrderCompleted` / `stepFromStatus`).
+ *
+ * Nomornya SELALU dari model kanonik 11 tahap, bukan dari posisi nama di tabel
+ * `production_steps`. Dulu nomornya dicari di daftar nama itu — dan karena
+ * isinya masih 9 nama versi lama ("Print", "Pres", "Potong"), customer melihat
+ * "Tahap 3 / 9" (27%) untuk pesanan yang di dashboard sudah "tahap 4 / 11"
+ * (36%). Tabel `production_steps` sekarang hanya menentukan LABEL tahap.
  */
-function stepIndexFromStatus(status: string, steps: { name: string }[]): number {
-  if (isOrderCompleted(status)) return steps.length || TOTAL_STAGES;
-  const slug = normalizeStepName(status);
-  const idx =
-    steps.length > 0
-      ? steps.findIndex((s) => normalizeStepName(s.name) === slug) + 1
-      : stepFromStatus(slug);
-  return idx > 0 ? idx : 1;
+function stepIndexFromStatus(status: string): number {
+  if (isOrderCompleted(status)) return TOTAL_STAGES;
+  return stepFromStatus(status);
 }
 
 /**
@@ -210,7 +211,7 @@ function StatusContent() {
   // Animate progress counter
   useEffect(() => {
     if (!order || !loaded) return;
-    const stepIdx = stepIndexFromStatus(order.current_status, steps);
+    const stepIdx = stepIndexFromStatus(order.current_status);
     const hasTracking = !!(order.tracking_number && order.courier);
     const pct = getProgress(stepIdx, hasTracking);
 
@@ -424,9 +425,9 @@ function StatusContent() {
   }
 
   // Render order details
-  const step = stepIndexFromStatus(order.current_status, steps);
+  const step = stepIndexFromStatus(order.current_status);
   const isOrderDone = isOrderCompleted(order.current_status);
-  const totalSteps = steps.length || 11;
+  const totalSteps = TOTAL_STAGES;
   const hasTracking = !!(order.tracking_number && order.courier);
   const normalizedStatus = normalizeStepName(order.current_status);
   // Blok pengiriman cuma muncul kalau resinya ADA. Order yang langsung tuntas

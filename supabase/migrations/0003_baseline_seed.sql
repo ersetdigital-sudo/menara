@@ -32,18 +32,25 @@ on conflict (id) do update set
   logo_path       = excluded.logo_path;
 
 -- ----------------------------------------------------------------------------
--- Nama tahap pesanan jersey (9 baris) — dipakai halaman /status
+-- Nama tahap pesanan jersey (11 baris) — dipakai halaman /status
+--
+-- WAJIB 11 baris dan urutannya sama dengan ORDER_STATUS_LIST (lib/types.ts).
+-- Halaman /status memakai tabel ini sebagai LABEL; nomor tahapnya dari model
+-- kanonik di kode. Kalau isinya kurang/berbeda urutan, timeline customer
+-- bisa menunjuk tahap yang salah.
 -- ----------------------------------------------------------------------------
 insert into public.production_steps (name, position) values
-  ('Desain',    1),
-  ('Layout',    2),
-  ('Print',     3),
-  ('Pres',      4),
-  ('Potong',    5),
-  ('Jahit',     6),
-  ('Finishing', 7),
-  ('Packing',   8),
-  ('Kirim',     9)
+  ('Desain',                      1),
+  ('Layout',                      2),
+  ('Profing Warna',               3),
+  ('Cetak / Print',               4),
+  ('Press / Transfer Sublime',    5),
+  ('Potong Pola / Cutting Panel', 6),
+  ('Jahit / Sewing',              7),
+  ('Finishing',                   8),
+  ('Quality Control',             9),
+  ('Packing',                    10),
+  ('Kirim',                      11)
 on conflict (position) do update set name = excluded.name;
 
 -- ----------------------------------------------------------------------------

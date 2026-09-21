@@ -33,6 +33,7 @@ Semua file dijalankan manual lewat Supabase **SQL Editor** (atau `psql`), tidak 
 | `0003_baseline_seed.sql` | Identitas toko + daftar tahap jersey & maklon |
 | `0004_perbaiki_notifikasi_tahap.sql` | **Perbaikan bug produksi**: notifikasi WA tahap pesanan jersey tidak pernah terkirim karena tabel log-nya terhapus di migrasi lama |
 | `0005_rapikan_akses_warisan.sql` | Cabut policy & grant warisan, buang helper + index duplikat |
+| `0006_selaraskan_nama_tahap.sql` | **Perbaikan bug**: `production_steps` masih 9 nama pipeline lama, bikin customer melihat "Tahap 3/9" sementara dashboard "4/11" |
 
 ## Tabel (11)
 
@@ -40,7 +41,7 @@ Semua file dijalankan manual lewat Supabase **SQL Editor** (atau `psql`), tidak 
 | --- | --- |
 | `orders` | Order jersey: nomor order, data customer, deadline, `current_status`, `current_stage`, `last_notified_stage`, `deadline_notified_at`, foto design/WO, `products` (jsonb) |
 | `order_status_history` | Riwayat perubahan tahap per order — sumber timeline di halaman tracking |
-| `production_steps` | Nama 9 tahap produksi jersey yang tampil di halaman `/status`, bisa diatur admin |
+| `production_steps` | **11** nama tahap jersey (harus sama urutannya dengan `ORDER_STATUS_LIST`), dipakai sebagai label di halaman `/status`; bisa diatur admin |
 | `stage_notification_logs` | Anti-duplikat notifikasi WA tahap jersey. `UNIQUE (order_id, stage)` = kuncinya |
 | `notification_logs` | Riwayat notifikasi **deadline** (cron): order, nomor HP, status kirim, error, selisih hari |
 | `maklon_orders` | Order maklon (toll manufacturing) — tabel terpisah dengan 6 tahap sendiri |
