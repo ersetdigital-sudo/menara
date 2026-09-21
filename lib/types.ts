@@ -119,7 +119,8 @@ export interface Order {
   custom_number: string;
   design_notes: string;
   current_status: OrderStatus;
-  /** Nomor tahap produksi aktif (1-11), lihat lib/fonnte.ts STAGE_NAMES. */
+  /** Nomor tahap produksi aktif (1-11). Label tahap ada di `stageLabel()`
+   *  (lib/order-status.ts), yang menurun dari ORDER_STATUS_LIST di atas. */
   current_stage?: number | null;
   /** Tahap terakhir yang notifikasi WA-nya berhasil terkirim. */
   last_notified_stage?: number | null;

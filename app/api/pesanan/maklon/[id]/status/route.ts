@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
 import { triggerMaklonStageNotification } from "@/lib/fonnte";
-
-const STATUS_FROM_STEP = [
-  "layout",
-  "profing_warna",
-  "cutting_bahan",
-  "press_sublime",
-  "qc",
-  "kirim",
-];
-
-/** Tahap terakhir (6, "Kirim") = tahap yang bikin order langsung tuntas. */
-const FINAL_STEP = STATUS_FROM_STEP.length;
-
-function statusFromStep(step: number): string {
-  return STATUS_FROM_STEP[Math.min(Math.max(step, 1), 6) - 1] || "layout";
-}
+import {
+  MAKLON_FINAL_STEP,
+  clampMaklonStep,
+  maklonStatusFromStep,
+} from "@/lib/maklon-status";
 
 export async function PATCH(
   request: Request,
@@ -58,15 +47,15 @@ export async function PATCH(
   };
 
   if (current_step !== undefined) {
-    const newStage = Math.min(Math.max(Number(current_step), 1), 6);
+    const newStage = clampMaklonStep(Number(current_step));
     updateData.current_stage = newStage;
     // Tahap akhir = maklon TUNTAS: status langsung "selesai", tanpa wajib nomor
     // resi. Resi/ekspedisi tetap opsional — kalau diisi, halaman tracking maklon
     // tetap menampilkan baris pengirimannya.
-    if (newStage === FINAL_STEP) {
+    if (newStage === MAKLON_FINAL_STEP) {
       updateData.current_status = "selesai";
     } else {
-      updateData.current_status = statusFromStep(newStage);
+      updateData.current_status = maklonStatusFromStep(newStage);
     }
   }
   if (note !== undefined) updateData.design_notes = note;
@@ -97,7 +86,7 @@ export async function PATCH(
   if (current_step !== undefined && updatedOrder) {
     // History harus sama persis dengan status yang tersimpan
     // (tahap akhir = "selesai").
-    const statusValue = updateData.current_status ?? statusFromStep(Number(current_step));
+    const statusValue = updateData.current_status ?? maklonStatusFromStep(Number(current_step));
     await supabase.from("maklon_status_history").insert({
       order_id: updatedOrder.id,
       status: statusValue,
@@ -106,7 +95,7 @@ export async function PATCH(
   }
 
   const previousStage = existing.current_stage ?? null;
-  const newStage = current_step !== undefined ? Math.min(Math.max(Number(current_step), 1), 6) : null;
+  const newStage = current_step !== undefined ? clampMaklonStep(Number(current_step)) : null;
   const notification: { stage: number | null; status: string } = { stage: newStage, status: "none" };
 
   if (updatedOrder && newStage !== null && newStage !== previousStage) {

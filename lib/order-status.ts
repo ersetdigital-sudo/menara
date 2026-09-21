@@ -86,6 +86,32 @@ export function statusFromStep(step: number): string {
 }
 
 /**
+ * Map slug status → nomor tahap (1-11).
+ * Slug lama (`print`, `pres`, `potong`) ikut dipetakan, jadi pemanggil tidak
+ * perlu menormalkan dulu untuk baris warisan di database.
+ */
+export const STATUS_TO_STAGE: Record<string, number> = (() => {
+  const map: Record<string, number> = {};
+  ORDER_STATUS_LIST.forEach((status, index) => {
+    map[status] = index + 1;
+  });
+  for (const [legacy, current] of Object.entries(LEGACY_STATUS_MAP)) {
+    if (map[current]) map[legacy] = map[current];
+  }
+  return map;
+})();
+
+/**
+ * Nama tahap untuk pesan WhatsApp dan UI (mis. tahap 4 → "Cetak / Print").
+ * Labelnya sama persis dengan `ORDER_STATUS_LABELS`, jadi template pesan tidak
+ * punya daftar nama sendiri yang bisa basi.
+ */
+export function stageLabel(step: number): string {
+  const slug = statusFromStep(step);
+  return ORDER_STATUS_LABELS[slug as OrderStatus] || `Tahap ${step}`;
+}
+
+/**
  * Catatan default untuk baris history yang di-backfill endpoint
  * /api/track/ensure-history (key = slug tahap).
  */

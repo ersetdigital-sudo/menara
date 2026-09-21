@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
-import { generateOrderNumber } from "@/lib/queries-orders";
+import { generateOrderNumber } from "@/lib/order-number";
 import { isOrderCompleted, progressPercentFromStatus, stepFromStatus } from "@/lib/order-status";
 
 function mapOrder(row: any) {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   let orderNumber = id ? String(id).trim().toUpperCase() : "";
   if (!orderNumber) {
     try {
-      orderNumber = await generateOrderNumber();
+      orderNumber = await generateOrderNumber(supabase);
     } catch {
       return NextResponse.json(
         { error: "Gagal generate nomor order, coba lagi" },

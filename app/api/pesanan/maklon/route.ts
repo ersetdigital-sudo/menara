@@ -1,33 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
-
-const MAKLON_STATUS_LIST = [
-  "layout",
-  "profing_warna",
-  "cutting_bahan",
-  "press_sublime",
-  "qc",
-  "kirim",
-];
-
-const MAKLON_STEP_PROGRESS: Record<number, number> = {
-  1: 17,
-  2: 33,
-  3: 50,
-  4: 67,
-  5: 83,
-  6: 100,
-};
-
-function getProgress(step: number, hasTracking: boolean): number {
-  if (step === 6 && hasTracking) return 100;
-  return MAKLON_STEP_PROGRESS[step] ?? 0;
-}
+import {
+  MAKLON_FINAL_STEP,
+  clampMaklonStep,
+  isMaklonCompleted,
+  maklonProgress,
+} from "@/lib/maklon-status";
+import { MAKLON_NUMBER_PREFIX, generateOrderNumber } from "@/lib/order-number";
 
 function mapOrder(row: any) {
   const hasTracking = !!(row.tracking_number && row.courier);
-  const step = row.current_stage || 1;
-  const pct = getProgress(step, hasTracking);
+  const step = clampMaklonStep(row.current_stage || 1);
+  const pct = maklonProgress(step, hasTracking);
   return {
     id: row.order_number,
     customer_name: row.customer_name,
@@ -49,43 +33,11 @@ function mapOrder(row: any) {
     note_time: row.updated_at || "",
     courier: row.courier || "",
     tracking_number: row.tracking_number || "",
-    is_done: row.current_status === "selesai" || (step === 6 && hasTracking),
+    is_done: isMaklonCompleted(row.current_status) || (step === MAKLON_FINAL_STEP && hasTracking),
     deadline: row.deadline || null,
     created_at: row.created_at,
     pct,
   };
-}
-
-const CHARSET = "ACDEFGHJKMNPQRSTUVWXYZ23456789";
-
-function randomCode(len = 4): string {
-  let code = "";
-  for (let i = 0; i < len; i++) {
-    code += CHARSET[Math.floor(Math.random() * CHARSET.length)];
-  }
-  return code;
-}
-
-function jakartaDatePart(date = new Date()): string {
-  const jkt = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-  const yy = String(jkt.getFullYear()).slice(-2);
-  const mm = String(jkt.getMonth() + 1).padStart(2, "0");
-  const dd = String(jkt.getDate()).padStart(2, "0");
-  return `${yy}${mm}${dd}`;
-}
-
-async function generateMaklonNumber(supabase: any): Promise<string> {
-  const datePart = jakartaDatePart();
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidate = `MKL${datePart}${randomCode()}`;
-    const { data } = await supabase
-      .from("maklon_orders")
-      .select("order_number")
-      .eq("order_number", candidate)
-      .maybeSingle();
-    if (!data) return candidate;
-  }
-  throw new Error("Gagal generate nomor maklon unik");
 }
 
 export async function GET() {
@@ -139,7 +91,10 @@ export async function POST(request: Request) {
   let orderNumber = id ? String(id).trim().toUpperCase() : "";
   if (!orderNumber) {
     try {
-      orderNumber = await generateMaklonNumber(supabase);
+      orderNumber = await generateOrderNumber(supabase, {
+        table: "maklon_orders",
+        prefix: MAKLON_NUMBER_PREFIX,
+      });
     } catch {
       return NextResponse.json(
         { error: "Gagal generate nomor maklon, coba lagi" },

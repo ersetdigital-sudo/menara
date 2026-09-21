@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
-import { getAllOrders, generateOrderNumber } from "@/lib/queries-orders";
+import { getAllOrders } from "@/lib/queries-orders";
+import { generateOrderNumber } from "@/lib/order-number";
+import { ORDER_STATUS_LIST } from "@/lib/types";
 
 /**
  * GET /api/admin/orders — list all orders (admin only)
@@ -26,7 +28,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const orderNumber = await generateOrderNumber();
+    const orderNumber = await generateOrderNumber(supabase);
+    // Status awal = tahap pertama dari ORDER_STATUS_LIST ("desain"). Nilai
+    // warisan `order_diterima` tidak dipakai lagi: dia tidak ada di daftar
+    // tahap, sehingga di halaman tracking hanya terbaca lewat fallback.
+    const initialStatus = ORDER_STATUS_LIST[0];
 
     const { data: order, error } = await supabase
       .from("orders")
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
         custom_name: body.customName || "",
         custom_number: body.customNumber || "",
         design_notes: body.designNotes || "",
-        current_status: "order_diterima",
+        current_status: initialStatus,
         current_stage: 1,
       })
       .select()
@@ -53,7 +59,7 @@ export async function POST(request: NextRequest) {
     // Insert initial status history
     await supabase.from("order_status_history").insert({
       order_id: order.id,
-      status: "order_diterima",
+      status: initialStatus,
       note: "Pesanan berhasil dibuat",
     });
 

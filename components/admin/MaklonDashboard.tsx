@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { MAKLON_STAGES, maklonProgress } from "@/lib/maklon-status";
 import { Search, AlertTriangle } from "lucide-react";
 
 // Optimasi delivery yang sama seperti upload design lama (f_auto,q_auto)
@@ -11,28 +12,16 @@ function optimizeDesignUrl(url: string): string {
 
 type StepRow = { id: string; name: string; position: number };
 
-const DEFAULT_STEPS: StepRow[] = [
-  { id: "", name: "Layout", position: 1 },
-  { id: "", name: "Profing Warna", position: 2 },
-  { id: "", name: "Cutting Bahan", position: 3 },
-  { id: "", name: "Press Sublime", position: 4 },
-  { id: "", name: "QC", position: 5 },
-  { id: "", name: "Kirim", position: 6 },
-];
-
-const STEP_PROGRESS: Record<number, number> = {
-  1: 17,
-  2: 33,
-  3: 50,
-  4: 67,
-  5: 83,
-  6: 100,
-};
-
-function getStepPct(step: number, hasTracking: boolean): number {
-  if (step === 6 && hasTracking) return 100;
-  return STEP_PROGRESS[step] ?? 0;
-}
+/**
+ * Daftar tahap cadangan bila /api/pesanan/maklon/steps belum terisi.
+ * Diturunkan dari MAKLON_STAGES (lib/maklon-status.ts) — satu sumber kebenaran
+ * tahap maklon.
+ */
+const DEFAULT_STEPS: StepRow[] = MAKLON_STAGES.map((stage) => ({
+  id: "",
+  name: stage.label,
+  position: stage.step,
+}));
 
 type OrderData = {
   id: string;
@@ -1048,7 +1037,7 @@ function DetailSheet({
       : step <= 1
         ? "baru"
         : "produksi";
-  const pct = getStepPct(step, hasTracking);
+  const pct = maklonProgress(step, hasTracking);
 
   const save = async () => {
     setError("");

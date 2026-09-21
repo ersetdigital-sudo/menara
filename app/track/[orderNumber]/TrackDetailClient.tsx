@@ -22,17 +22,24 @@ import {
 } from "@/lib/order-status";
 import { buildWhatsAppLink } from "@/lib/wa";
 
+/**
+ * Ikon per tahap. Kuncinya adalah slug dari ORDER_STATUS_LIST — versi lama
+ * peta ini masih memakai slug 10 tahap (order_diterima, printing_sublimasi, …)
+ * yang sudah tidak pernah muncul lagi, sehingga ikonnya tidak tampil sama sekali.
+ */
 const STATUS_ICONS: Record<string, string> = {
-  order_diterima: "📋",
-  desain_dikonfirmasi: "🎨",
-  produksi_bahan: "🧵",
-  printing_sublimasi: "🖨️",
-  cutting: "✂️",
+  desain: "🎨",
+  layout: "📐",
+  profing_warna: "🎛️",
+  cetak_print: "🖨️",
+  press_transfer: "🔥",
+  potong_pola: "✂️",
   jahit: "🪡",
-  quality_control: "✅",
   finishing: "🔧",
+  quality_control: "✅",
   packing: "📦",
-  siap_dikirim: "🚚",
+  kirim: "🚚",
+  selesai: "🏁",
 };
 
 const COURIER_LINKS: Record<string, string> = {

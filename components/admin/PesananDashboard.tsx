@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_LIST, getProgress } from "@/lib/types";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Search, AlertTriangle } from "lucide-react";
 
@@ -13,28 +14,16 @@ function optimizeDesignUrl(url: string): string {
 
 type StepRow = { id: string; name: string; position: number };
 
-const DEFAULT_STEPS: StepRow[] = [
-  { id: "", name: "Desain", position: 1 },
-  { id: "", name: "Layout", position: 2 },
-  { id: "", name: "Profing Warna", position: 3 },
-  { id: "", name: "Cetak / Print", position: 4 },
-  { id: "", name: "Press / Transfer Sublime", position: 5 },
-  { id: "", name: "Potong Pola / Cutting Panel", position: 6 },
-  { id: "", name: "Jahit / Sewing", position: 7 },
-  { id: "", name: "Finishing", position: 8 },
-  { id: "", name: "Quality Control", position: 9 },
-  { id: "", name: "Packing", position: 10 },
-  { id: "", name: "Kirim", position: 11 },
-];
-
-const STEP_PROGRESS: Record<number, number> = {
-  1: 9, 2: 18, 3: 27, 4: 36, 5: 45, 6: 55, 7: 64, 8: 73, 9: 82, 10: 91, 11: 100,
-};
-
-function getStepPct(step: number, hasTracking: boolean): number {
-  if (step === 11 && hasTracking) return 100;
-  return STEP_PROGRESS[step] ?? 0;
-}
+/**
+ * Daftar tahap cadangan bila /api/pesanan/steps belum mengembalikan apa pun.
+ * Diturunkan dari ORDER_STATUS_LIST + ORDER_STATUS_LABELS (lib/types.ts), jadi
+ * menambah tahap produksi tidak perlu mengedit daftar di komponen ini.
+ */
+const DEFAULT_STEPS: StepRow[] = ORDER_STATUS_LIST.map((status, index) => ({
+  id: "",
+  name: ORDER_STATUS_LABELS[status],
+  position: index + 1,
+}));
 
 const LANES = [
   { name: "Desain & Layout", from: 1, to: 2 },
@@ -3652,7 +3641,7 @@ function DetailSheet({
           ? "baru"
           : "produksi";
 
-  const pct = getStepPct(step, hasTracking);
+  const pct = getProgress(step, hasTracking);
 
   const save = async () => {
     setKirimError("");

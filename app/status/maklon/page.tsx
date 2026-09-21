@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/server";
 import { verifyToken } from "@/lib/verify-token";
+import { MAKLON_STAGES, MAKLON_STEP_PROGRESS } from "@/lib/maklon-status";
 
 /**
  * Halaman tracking publik untuk pesanan MAKLON.
@@ -22,23 +23,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const DEFAULT_STEP_NAMES = [
-  "Layout",
-  "Profing Warna",
-  "Cutting Bahan",
-  "Press Sublime",
-  "QC",
-  "Kirim",
-];
-
-const STEP_PROGRESS: Record<number, number> = {
-  1: 17,
-  2: 33,
-  3: 50,
-  4: 67,
-  5: 83,
-  6: 100,
-};
+/** Nama tahap cadangan bila tabel `maklon_steps` belum berisi apa pun. */
+const DEFAULT_STEP_NAMES = MAKLON_STAGES.map((stage) => stage.label);
 
 const BRAND_FALLBACK = { name: "MENARA", whatsapp_number: "628115491117" };
 
@@ -330,7 +316,7 @@ export default async function MaklonStatusPage({
   const hasTracking = !!(order.courier && order.tracking_number);
   const pct = isDone || (step >= totalSteps && hasTracking)
     ? 100
-    : STEP_PROGRESS[step] ?? 0;
+    : MAKLON_STEP_PROGRESS[step] ?? 0;
   const stageName = stepNames[step - 1] || `Tahap ${step}`;
   const designPhotos = photoUrls(order.design_photos);
 

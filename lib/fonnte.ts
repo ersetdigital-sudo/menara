@@ -9,8 +9,10 @@
 
 import { normalizeWhatsAppNumber } from "@/lib/wa";
 import { decryptSecret } from "@/lib/fonnte-crypto";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { signTrackingToken } from "@/lib/verify-token";
+import { stageLabel } from "@/lib/order-status";
+import { maklonLabelFromStep } from "@/lib/maklon-status";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAppUrl } from "@/lib/app-url";
 
@@ -18,40 +20,11 @@ export const FONNTE_TOKEN_KEY = "fonnte_token";
 export const FONNTE_API_URL = "https://api.fonnte.com/send";
 export const FONNTE_TIMEOUT_MS = 10_000;
 
-/** Nama tahap produksi (1-11). */
-export const STAGE_NAMES: Record<number, string> = {
-  1: "Desain",
-  2: "Layout",
-  3: "Profing Warna",
-  4: "Cetak / Print",
-  5: "Press / Transfer Sublime",
-  6: "Potong Pola / Cutting Panel",
-  7: "Jahit / Sewing",
-  8: "Finishing",
-  9: "Quality Control",
-  10: "Packing",
-  11: "Kirim",
-};
-
-/** Map status text (kolom current_status) → nomor tahap 1-11. */
-export const STATUS_TO_STAGE: Record<string, number> = {
-  desain: 1,
-  layout: 2,
-  profing_warna: 3,
-  cetak_print: 4,
-  press_transfer: 5,
-  potong_pola: 6,
-  jahit: 7,
-  finishing: 8,
-  quality_control: 9,
-  packing: 10,
-  kirim: 11,
-};
-
-/** Map nomor tahap 1-11 → status text (kebalikan STATUS_TO_STAGE). */
-export const STAGE_TO_STATUS: Record<number, string> = Object.fromEntries(
-  Object.entries(STATUS_TO_STAGE).map(([status, stage]) => [stage, status])
-);
+// Daftar nama tahap TIDAK ditulis ulang di file ini. Sumbernya:
+//   * pesanan jersey → lib/order-status.ts (`stageLabel`, `STATUS_TO_STAGE`)
+//   * pesanan maklon → lib/maklon-status.ts (`maklonLabelFromStep`)
+// Dengan begitu template pesan WhatsApp tidak bisa ketinggalan saat tahap
+// produksi diubah.
 
 /**
  * URL tracking publik (encode nomor pesanan bila ada karakter spesial).
@@ -102,7 +75,7 @@ export function buildWhatsAppMessage(
     ].join("\n");
   }
 
-  const stageName = STAGE_NAMES[stage] ?? `Tahap ${stage}`;
+  const stageName = stageLabel(stage);
 
     return [
       "UPDATE PESANAN",
@@ -121,16 +94,6 @@ export function buildWhatsAppMessage(
       "Terima kasih sudah mempercayakan pesanan Kakak kepada MENARA.",
     ].join("\n");
 }
-
-/** Nama tahap produksi Maklon (1-6). */
-export const MAKLON_STAGE_NAMES: Record<number, string> = {
-  1: "Layout",
-  2: "Profing Warna",
-  3: "Cutting Bahan",
-  4: "Press Sublime",
-  5: "QC",
-  6: "Kirim",
-};
 
 /**
  * Template WhatsApp untuk update tahap Maklon (1-6).
@@ -159,7 +122,7 @@ export function buildMaklonWhatsAppMessage(
     ].join("\n");
   }
 
-  const stageName = MAKLON_STAGE_NAMES[stage] ?? `Tahap ${stage}`;
+  const stageName = maklonLabelFromStep(stage);
 
   return [
     "UPDATE MAKLON",
@@ -189,9 +152,9 @@ export function isValidFonntePhone(phone: string): boolean {
  * Return null bila belum disimpan. TIDAK pernah di-log.
  */
 export async function getFonnteToken(): Promise<string | null> {
-  const supabase = await createClient();
-  // Lewat RPC SECURITY DEFINER supaya jalan juga dari endpoint anon
-  // (dashboard Pesanan). Nilai tetap ciphertext — didekripsi di sini.
+  // Service role: RPC get_app_setting_value sudah tidak bisa dipanggil anon
+  // (lihat migrasi 0005). Nilai tetap ciphertext — didekripsi di sini.
+  const supabase = createServiceClient();
   const { data } = await supabase.rpc("get_app_setting_value", {
     p_key: FONNTE_TOKEN_KEY,
   });

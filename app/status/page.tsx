@@ -11,7 +11,9 @@ import {
   type OrderStatus,
 } from "@/lib/types";
 import {
+  STAGE_BACKFILL_NOTES,
   isOrderCompleted,
+  normalizeOrderStatus,
   stepFromStatus,
   TOTAL_STAGES,
 } from "@/lib/order-status";
@@ -58,17 +60,14 @@ const LABEL_TO_SLUG: Record<string, string> = Object.fromEntries(
   Object.entries(ORDER_STATUS_LABELS).map(([slug, label]) => [label.toLowerCase(), slug])
 );
 
-// Map old 9-step slugs to new 11-step slugs
-const LEGACY_SLUG_MAP: Record<string, string> = {
-  print: "cetak_print",
-  pres: "press_transfer",
-  potong: "potong_pola",
-};
-
+/**
+ * Nama tahap dari database (`production_steps`) atau status lama → slug 11 tahap.
+ * Alias slug lama (`print`, `pres`, `potong`) ditangani lib/order-status.ts,
+ * jadi aturan konversinya cuma ada di satu tempat.
+ */
 function normalizeStepName(name: string): string {
-  const lower = name.toLowerCase();
-  if (LEGACY_SLUG_MAP[lower]) return LEGACY_SLUG_MAP[lower];
-  return LABEL_TO_SLUG[lower] || lower;
+  const lower = name.trim().toLowerCase();
+  return LABEL_TO_SLUG[lower] || normalizeOrderStatus(lower);
 }
 
 /**
@@ -86,42 +85,27 @@ function stepIndexFromStatus(status: string, steps: { name: string }[]): number 
   return idx > 0 ? idx : 1;
 }
 
+/**
+ * Kalimat penjelas tahap. Isinya dari STAGE_BACKFILL_NOTES (lib/order-status.ts),
+ * kecuali dua tahap yang teksnya tergantung ada/tidaknya nomor resi.
+ */
 function stepDescription(status: string, hasTracking: boolean): string {
   const slug = normalizeStepName(status);
-  const map: Record<string, string> = {
-    desain: "Desain sedang dikerjakan",
-    layout: "Layout sedang disusun",
-    profing_warna: "Proses profing warna",
-    cetak_print: "Proses printing/sublimasi",
-    press_transfer: "Proses pres transfer",
-    potong_pola: "Bahan sedang dipotong",
-    jahit: "Proses penjahitan",
-    finishing: "Quality control & finishing",
-    quality_control: "Quality control & finishing",
-    packing: "Pesanan sedang dikemas",
-    kirim: hasTracking ? "Pesanan telah dikirim" : "Sedang diproses untuk pengiriman",
-    selesai: "Pesanan telah selesai",
-  };
-  return map[slug] || "Sedang diproses";
+  if (slug === "kirim") {
+    return hasTracking ? "Pesanan telah dikirim" : "Sedang diproses untuk pengiriman";
+  }
+  if (isOrderCompleted(slug)) return "Pesanan telah selesai";
+  return STAGE_BACKFILL_NOTES[slug] || "Sedang diproses";
 }
 
+/** Judul tahap yang tampil besar di kartu progres. */
 function stepHighlight(status: string, hasTracking: boolean): string {
   const slug = normalizeStepName(status);
-  const map: Record<string, string> = {
-    desain: "Desain",
-    layout: "Layout",
-    profing_warna: "Profing Warna",
-    cetak_print: "Cetak / Print",
-    press_transfer: "Press / Transfer Sublime",
-    potong_pola: "Potong Pola / Cutting Panel",
-    jahit: "Jahit / Sewing",
-    finishing: "Finishing",
-    quality_control: "Quality Control",
-    packing: "Packing",
-    kirim: hasTracking ? "Pesanan Telah Dikirim" : "Sedang Diproses untuk Pengiriman",
-    selesai: "Pesanan Selesai",
-  };
-  return map[slug] || "Sedang Diproses";
+  if (slug === "kirim") {
+    return hasTracking ? "Pesanan Telah Dikirim" : "Sedang Diproses untuk Pengiriman";
+  }
+  if (isOrderCompleted(slug)) return "Pesanan Selesai";
+  return ORDER_STATUS_LABELS[slug as OrderStatus] || "Sedang Diproses";
 }
 
 export default function StatusPage() {

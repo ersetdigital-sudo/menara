@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
 import { ORDER_STATUS_LIST, type OrderStatus } from "@/lib/types";
+import { STATUS_TO_STAGE } from "@/lib/order-status";
 import {
-  STATUS_TO_STAGE,
   triggerStageNotification,
   type NotificationTriggerStatus,
 } from "@/lib/fonnte";
@@ -24,7 +24,7 @@ interface NotificationResult {
  * 1. Ambil order → previous_stage = current_stage (dari DB) SEBELUM update.
  * 2. Update order.current_stage = new_stage (stage baru dari request).
  * 3. Jika new_stage == previous_stage → tanpa notifikasi, langsung sukses.
- * 4. Jika berbeda → INSERT notification_logs dulu (unique (order_id, stage)):
+ * 4. Jika berbeda → klaim slot di stage_notification_logs (unique (order_id, stage)):
  *    - gagal karena unique constraint → skip kirim (anti-duplikat, aman dari race condition)
  *    - berhasil → build pesan → kirim Fonnte → update log (success/failed) →
  *      update last_notified_stage HANYA jika sukses.
@@ -82,10 +82,10 @@ export async function PATCH(
       );
     }
 
-    const newStage = STATUS_TO_STAGE[status as OrderStatus] ?? null;
+    const newStage = STATUS_TO_STAGE[status] ?? null;
     const previousStage =
       existing.current_stage ??
-      STATUS_TO_STAGE[existing.current_status as OrderStatus] ??
+      STATUS_TO_STAGE[existing.current_status] ??
       null;
 
     // 2. Update order — tersimpan apa pun hasil kirim WA (tanpa rollback).

@@ -1,24 +1,18 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
-import {
-  STATUS_TO_STAGE,
-  triggerStageNotification,
-  type NotificationTriggerStatus,
-} from "@/lib/fonnte";
+import { triggerStageNotification, type NotificationTriggerStatus } from "@/lib/fonnte";
+import { STATUS_TO_STAGE, statusFromStep } from "@/lib/order-status";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ORDER_STATUS_LIST } from "@/lib/types";
-
-function statusFromStep(step: number): string {
-  return ORDER_STATUS_LIST[Math.min(Math.max(step, 1), 11) - 1] || "desain";
-}
 
 /**
  * PATCH /api/pesanan/orders/[id]/status — update tahap produksi dari
  * dashboard Pesanan (id = order_number).
  *
  * Sama seperti endpoint admin: notifikasi WA (Fonnte) dipicu HANYA bila
- * tahap BENAR-BENAR berubah, anti-duplikat lewat unique (order_id, stage),
- * dan kegagalan kirim WA tidak menggagalkan update status.
+ * tahap BENAR-BENAR berubah, anti-duplikat lewat unique (order_id, stage) di
+ * stage_notification_logs, dan kegagalan kirim WA tidak menggagalkan update
+ * status.
  */
 export async function PATCH(
   request: Request,

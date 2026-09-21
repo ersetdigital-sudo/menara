@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { hasAdminAccess } from "@/lib/admin-auth";
+import { getAdminDb } from "@/lib/admin-auth";
 import {
   decryptSecret,
   encryptSecret,
@@ -14,13 +13,14 @@ import { FONNTE_TOKEN_KEY } from "@/lib/fonnte";
  * dikirim ke client/browser.
  */
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = await getAdminDb();
 
-  if (!(await hasAdminAccess(supabase))) {
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Lewat RPC SECURITY DEFINER supaya jalan juga dari dashboard Pesanan (anon key).
+  // RPC SECURITY DEFINER. Sejak migrasi 0005 hanya service role yang boleh
+  // memanggilnya, karena itu request ini memakai client dari getAdminDb().
   const { data } = await supabase.rpc("get_app_setting_value", {
     p_key: FONNTE_TOKEN_KEY,
   });
@@ -53,9 +53,9 @@ export async function GET() {
  * Token DIENKRIPSI (AES-256-GCM) sebelum masuk DB dan TIDAK PERNAH di-log.
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const supabase = await getAdminDb();
 
-  if (!(await hasAdminAccess(supabase))) {
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
