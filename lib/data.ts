@@ -10,9 +10,7 @@ import {
   BagIcon,
   BoltIcon,
   FacebookIcon,
-  FlameIcon,
   GiftIcon,
-  GridIcon,
   InstagramIcon,
   MapsIcon,
   PaletteIcon,
@@ -72,14 +70,6 @@ const waLink = buildWhatsAppLink(
 
 export const ctaLinks: CTALink[] = [
   {
-    title: "Lihat Katalog & Harga Lengkap",
-    description: "Pilihan model, bahan, dan harga terbaru",
-    icon: GridIcon,
-    accent: "primary",
-    href: `${brand.url}/katalog`,
-    external: true,
-  },
-  {
     title: "Chat WhatsApp",
     description: "Order & tanya desain langsung ke admin",
     icon: WhatsAppIcon,
@@ -102,14 +92,6 @@ export const ctaLinks: CTALink[] = [
     accent: "neutral",
     href: waLink,
     external: true,
-  },
-  {
-    title: "Promo Kemerdekaan",
-    description: "Cek promo spesial kemerdekaan & penawaran terbaru bulan ini",
-    icon: FlameIcon,
-    accent: "danger",
-    href: "/promo-bulan-ini",
-    external: false,
   },
 ];
 

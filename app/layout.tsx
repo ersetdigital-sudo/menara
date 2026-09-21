@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { getAppUrl } from "@/lib/app-url";
 import { getBrand } from "@/lib/queries";
 import "./globals.css";
 
@@ -24,7 +25,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const taglineFirstLine = brand.tagline.split("\n")[0];
 
   return {
-    metadataBase: brand.url ? new URL(brand.url) : undefined,
+    // Canonical = domain aplikasi ini sendiri, dibaca dari env Vercel.
+    // Sebelumnya memakai `brand.url` (domain situs katalog), dan nilainya
+    // ternyata sudah mati — jadi canonical/OG mengarah ke halaman 404.
+    metadataBase: new URL(getAppUrl()),
     title: {
       default: `${brand.name} — Admin Panel`,
       template: `%s · ${brand.name}`,
@@ -34,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: "website",
       locale: "id_ID",
-      url: brand.url,
+      url: getAppUrl(),
       siteName: brand.name,
       title: `${brand.name} — ${taglineFirstLine}`,
       description: brand.description,
