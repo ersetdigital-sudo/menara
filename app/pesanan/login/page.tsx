@@ -18,7 +18,7 @@ export default function PesananLoginPage() {
       const res = await fetch("/api/pesanan/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: password.trim() }),
       });
 
       if (!res.ok) {
@@ -67,6 +67,8 @@ export default function PesananLoginPage() {
             <input
               required
               type="password"
+              autoComplete="off"
+              name="menara-pesanan-pass"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
