@@ -16,11 +16,13 @@ export default async function HomePage() {
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0c0c0d] px-5 py-16 text-white">
       <div className="pointer-events-none absolute -top-40 right-[-120px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,229,0,.18),transparent_70%)]" />
       <div className="relative w-full max-w-[420px] text-center">
+        {/* Rasio 190:121 mengikuti bentuk asli logo (720x459) supaya tidak ada
+            pergeseran tata letak saat gambar selesai dimuat. */}
         <Image
           src={brand.logoPath || "/logo-menara.png"}
           alt={brand.name}
           width={190}
-          height={72}
+          height={121}
           className="mx-auto h-auto w-[190px] object-contain"
           priority
         />

@@ -81,12 +81,13 @@ export default function TrackPage() {
           {/* nav */}
           <header className="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between">
             <a href="/" className="flex items-center gap-3">
-<img
-  src="/logo-menara.png"
-  alt="MENARA"
-  style={{ height: "40px", width: "auto" }}
-  className="rounded-lg"
-/>
+{/* Mark saja (tanpa wordmark), karena teks MENARA sudah ada di sampingnya */}
+                <img
+                  src="/logo-menara-mark.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-10 w-auto"
+                />
               <span className="leading-none">
                 <span className="block trk-display text-[15px] tracking-tight">
                   MENARA

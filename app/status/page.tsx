@@ -464,11 +464,12 @@ function StatusContent() {
   className="shrink-0"
   aria-label="Kembali ke tracking"
 >
+  {/* Mark saja (tanpa wordmark), karena teks MENARA sudah ada di sampingnya */}
   <img
-    src="/logo-menara.png"
-    alt="MENARA"
-    style={{ height: "32px", width: "auto" }}
-    className="rounded-lg"
+    src="/logo-menara-mark.png"
+    alt=""
+    aria-hidden="true"
+    className="h-8 w-auto"
   />
 </a>
                 <div className="leading-tight">
