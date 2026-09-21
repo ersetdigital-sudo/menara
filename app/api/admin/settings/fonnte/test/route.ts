@@ -55,11 +55,25 @@ export async function POST(request: NextRequest) {
   const result = await sendFonnteMessage(phone, TEST_MESSAGE);
 
   if (!result.success) {
-    const detail =
-      typeof result.response?.detail === "string"
-        ? result.response.detail
-        : "Gagal mengirim pesan uji. Periksa kembali token Fonnte Anda.";
-    return NextResponse.json({ success: false, error: detail }, { status: 400 });
+    // Fonnte memakai `detail` untuk sukses dan `reason` untuk penolakan
+    // (mis. "token invalid", "device disconnected"). Dulu hanya `detail` yang
+    // dibaca, jadi penolakan apa pun tampil sebagai pesan generik dan admin
+    // tidak tahu harus memperbaiki apa.
+    const reason =
+      typeof result.response?.reason === "string"
+        ? result.response.reason
+        : typeof result.response?.detail === "string"
+          ? result.response.detail
+          : null;
+    return NextResponse.json(
+      {
+        success: false,
+        error: reason
+          ? `Fonnte menolak pengiriman: ${reason}. Periksa token & status device di dashboard Fonnte.`
+          : "Gagal mengirim pesan uji. Periksa token & status device Fonnte.",
+      },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ success: true });

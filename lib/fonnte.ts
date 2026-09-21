@@ -174,6 +174,14 @@ export async function getFonnteToken(): Promise<string | null> {
  * - Token diambil + didekripsi di server, dipakai sebagai header Authorization.
  * - Timeout 10 detik, error network ditangani try-catch.
  * - Return `{ success, response }` — response TIDAK pernah berisi token.
+ *
+ * PENTING — Fonnte membalas **HTTP 200** walau pesannya ditolak:
+ *   { "reason": "invalid token", "status": false }
+ * Jadi `res.ok` saja tidak cukup: dulu token invalid dianggap SUKSES, toast
+ * dashboard bilang "WA terkirim", log ditulis `success`, dan
+ * `last_notified_stage` ikut naik — padahal customer tidak menerima apa pun
+ * dan tahap itu tidak akan dikirim ulang (dianggap sudah pernah).
+ * Keberhasilan ditentukan oleh `status` di body, bukan status HTTP.
  */
 export async function sendFonnteMessage(
   phone: string,
@@ -209,8 +217,12 @@ export async function sendFonnteMessage(
       body = { status_code: res.status };
     }
 
+    // `status: false` (mis. "invalid token", "device disconnected") = GAGAL,
+    // walau HTTP-nya 200. Kalau field-nya tidak ada, cukup andalkan HTTP.
+    const accepted = res.ok && body.status !== false;
+
     return {
-      success: res.ok,
+      success: accepted,
       response: { status_code: res.status, ...body },
     };
   } catch (err) {

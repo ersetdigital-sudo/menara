@@ -28,6 +28,7 @@ cadangan di dashboard semuanya menurun dari dua file itu — tidak perlu dicari 
 | `wa.ts` | Normalisasi & validasi nomor WhatsApp + `buildWhatsAppLink` (satu tempat untuk aturan format internasional) |
 | `verify-token.ts` | Token tracking bertanda tangan HMAC: `signToken`, `verifyToken`, `signTrackingToken` (berlaku 30 hari), `buildSetCookie` |
 | `rate-limit.ts` | Rate limiter in-memory sliding window (`checkRateLimit`) untuk endpoint update tahap. Per-instance server, bukan global |
+| `notif-note.ts` | `waNote(status)` — ubah status kirim WA jadi kalimat toast ("WA terkirim", "WA gagal dikirim", …). Client-safe; dipakai form Pesanan & Maklon |
 
 Anti-duplikat notifikasi tidak dicek di kode, tapi di database: RPC
 `claim_stage_notification` mengandalkan `UNIQUE (order_id, stage)` di tabel
