@@ -161,6 +161,22 @@ function productLabel(name: string | null | undefined): string {
   return (name || "").trim() || "Tanpa nama produk";
 }
 
+/**
+ * Keluarga produk — istilah baku order jersey: "Setelan" = atasan + celana,
+ * "Atasan" = jersey saja (lihat daftar harga konveksi jersey, yang memakai
+ * heading ATASAN/SETELAN × LENGAN PENDEK/PANJANG).
+ *
+ * Nama bebas yang tidak menyebut keduanya (mis. "Jersey Home") TIDAK dipaksa
+ * masuk salah satu — dihitung sebagai "Lainnya" supaya total tetap utuh dan
+ * tebakannya tidak diam-diam salah.
+ */
+function productFamily(name: string): "Atasan" | "Setelan" | null {
+  const n = name.toLowerCase();
+  if (n.includes("setelan")) return "Setelan";
+  if (n.includes("atasan")) return "Atasan";
+  return null;
+}
+
 /* ── Customer: identitas berdasarkan nomor HP ──────────────────────────── */
 
 /**
@@ -1870,6 +1886,19 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
   }, [monthOrders]);
 
   const catTotal = cats.reduce((a, c) => a + c.pcs, 0);
+
+  // Komposisi Atasan vs Setelan — dimensi produksi: setelan ikut membuat celana.
+  const families = useMemo(() => {
+    const acc = { Atasan: 0, Setelan: 0, Lainnya: 0 };
+    cats.forEach((c) => {
+      const fam = productFamily(c.label);
+      if (fam) acc[fam] += c.pcs;
+      else acc.Lainnya += c.pcs;
+    });
+    return (["Setelan", "Atasan", "Lainnya"] as const)
+      .map((label) => ({ label, pcs: acc[label] }))
+      .filter((f) => f.pcs > 0);
+  }, [cats]);
   const catMax = Math.max(...cats.map((c) => c.pcs), 1);
   const CIRC = 2 * Math.PI * 46;
 
@@ -2097,6 +2126,19 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
               <span className="text-[11px] text-[var(--pas-muted)]">per nama produk</span>
             </div>
 
+            {families.length > 0 && (
+              <p className="text-[11.5px] text-[var(--pas-muted)] mb-3">
+                Komposisi:{" "}
+                {families.map((f, i) => (
+                  <span key={f.label}>
+                    {i > 0 && " · "}
+                    <b className="text-ink">{f.label}</b>{" "}
+                    <span className="pas-num">{nf(f.pcs)}</span> pcs
+                  </span>
+                ))}
+              </p>
+            )}
+
             {catTotal === 0 ? (
               <p className="text-[12.5px] text-[var(--pas-muted)] py-10 text-center">
                 Belum ada penjualan pada periode ini.
@@ -2219,8 +2261,10 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
               </div>
               <p className="text-[11px] text-[var(--pas-muted)] mt-3">
                 Dikelompokkan dari nama produk yang tersimpan di tiap pesanan — tidak ada
-                kategori tebakan. Order lama tanpa rincian produk dihitung pada satu baris
-                sesuai nama produknya agar total tetap utuh.
+                kategori tebakan. Baris komposisi menurunkannya ke istilah order:
+                <b> Setelan</b> = atasan + celana, <b>Atasan</b> = jersey saja. Order lama
+                tanpa rincian produk dihitung pada satu baris sesuai nama produknya agar
+                total tetap utuh.
               </p>
             </div>
           </div>
