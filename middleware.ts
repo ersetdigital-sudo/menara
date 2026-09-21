@@ -14,11 +14,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * Yang dilakukan:
  *  1. Refresh session Supabase lewat cookie (supaya Server Component selalu
  *     membaca session terbaru tanpa hard reload).
- *  2. Jaga rute `/admin/*` (kecuali `/admin/login` dan `/admin/signup`).
- *  3. Menitipkan pathname ke header `x-pathname` supaya layout server
+ *  2. Menitipkan pathname ke header `x-pathname` supaya layout server
  *     (mis. app/pesanan/layout.tsx) tahu halaman apa yang sedang dibuka.
+ *
+ * CATATAN: middleware ini dulu juga menjaga rute `/admin/*` (login/signup),
+ * warisan dari repo referensi. App ini tidak punya halaman `/admin` sama
+ * sekali, jadi blok itu membingungkan dan sudah dihapus. Gerbang dashboard
+ * yang sebenarnya ada di app/pesanan/layout.tsx (cookie `pesanan_auth`).
  */
-const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/signup"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -57,31 +60,11 @@ export async function middleware(request: NextRequest) {
   );
 
   // getUser() me-refresh token server-side. Jangan diganti getSession() —
-  // itu cuma membaca JWT tanpa refresh.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // itu cuma membaca JWT tanpa refresh. Hasilnya tidak dipakai di sini:
+  // penjagaan rute dashboard ada di app/pesanan/layout.tsx.
+  await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isPublicAdmin = PUBLIC_ADMIN_PATHS.some((p) => pathname === p);
-
-  // User yang sudah login tidak perlu melihat halaman login/signup.
-  if (user && (pathname === "/admin/login" || pathname === "/admin/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    return NextResponse.redirect(url);
-  }
-
-  // Blokir akses tanpa login ke rute admin yang dilindungi.
-  if (isAdminRoute && !isPublicAdmin && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  response.headers.set("x-pathname", pathname);
+  response.headers.set("x-pathname", request.nextUrl.pathname);
 
   return response;
 }
