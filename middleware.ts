@@ -23,20 +23,21 @@ const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/signup"];
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // Simpan di variabel lokal supaya tipenya ter-narrow dengan benar.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   // Supabase belum dikonfigurasi (mis. preview tanpa env var) — lewati
   // penanganan session supaya halaman tetap render dari data fallback.
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     const pathname = request.nextUrl.pathname;
     response.headers.set("x-pathname", pathname);
     return response;
   }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
