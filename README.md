@@ -116,7 +116,7 @@ Next.js 15 (App Router) on Vercel
         ▼
 Supabase (Postgres)
   all tables           RLS enabled, zero anon policies — service role only
-  public read          only the stage-name lists the status pages need
+  public read          only the shop identity + stage-name lists the status pages need
   RPCs                 atomic stage-claim for notifications
         │
         ├──▶ Fonnte (WhatsApp gateway)
@@ -125,7 +125,7 @@ Supabase (Postgres)
 
 ### Data model
 
-The schema is built from 29 versioned SQL migrations (`0001` → `0029`), applied in order. Ten tables remain — everything that served the marketing site was dropped once the platform was scoped to operations. The core of it:
+The schema is versioned as SQL migrations. Three baseline files describe a fresh database (`0001` schema, `0002` functions, `0003` seed); everything after that is incremental and idempotent, so an existing database applies only the files it hasn't seen. Eleven tables remain — everything that served the marketing site was dropped once the platform was scoped to operations. The core of it:
 
 | Table | Holds |
 |---|---|
@@ -133,7 +133,8 @@ The schema is built from 29 versioned SQL migrations (`0001` → `0029`), applie
 | `order_status_history` | Append-only record of every stage transition, with notes, photos and timestamps |
 | `maklon_orders` / `maklon_status_history` | The equivalent pair for toll-manufacturing jobs |
 | `production_steps` / `maklon_steps` | Operator-editable stage names, so the pipeline isn't hardcoded |
-| `notification_logs` | Every WhatsApp send attempt, with status and provider error |
+| `notification_logs` | Deadline reminder attempts: recipient, status, provider error, days-to-deadline |
+| `stage_notification_logs` | Anti-duplicate slot claims for stage updates — the unique `(order_id, stage)` that makes double-sends impossible |
 | `app_settings` | Encrypted gateway token, reminder schedule, capacity |
 
 ## Engineering notes
@@ -143,6 +144,8 @@ A few parts that were genuinely interesting to get right.
 **One source of truth for "what stage is this order at?".** `current_status` has 12 possible values but the pipeline only has 11 stages — `selesai` (completed) is a terminal order state, not a twelfth stage. The rule "completed = final stage = 100%" was originally re-implemented in four places, and each copy had its own missing guard. It now lives once in `lib/order-status.ts`, together with a normalisation map that transparently upgrades legacy slugs (`print`, `pres`, `potong`) from an earlier 9-stage pipeline. Old rows keep reading correctly without a data migration.
 
 **Stage notifications that cannot double-send.** Advancing a stage triggers a WhatsApp message, and the naive implementation races: two operators tapping at once, or a client retry, sends the customer the same update twice. `lib/fonnte.ts` instead calls an RPC (`claim_stage_notification`) that wins or loses on a unique `(order_id, stage)` constraint *before* any message is sent. A lost claim means another request already sent it. `last_notified_stage` is only written after the provider confirms success, so a failed send is retried rather than silently dropped.
+
+**A silent notification outage, found by calling the function.** That anti-duplicate log lived in a table which an unrelated later migration dropped and recreated for a different purpose. Nothing failed loudly: the table existed, the RPC existed, and the app reported nothing worse than a log line — but the claim now errored on a missing column, and the trigger returned early, so *no* jersey stage notification had been going out. Calling the RPC directly returned `column "stage" does not exist`, which is what a passing type-check and a green build can never tell you. The log moved to its own table (`stage_notification_logs`), the RPCs were rewritten against it, and a regression check against the RPC itself was added to the migration notes.
 
 **Tracking links that don't leak.** A dashboard behind a shared password is fine for staff, but customers shouldn't need accounts. Jersey orders are verified by normalising both sides to digits before comparing the phone number. Messages sent over WhatsApp carry an HMAC-SHA256 signed token (30-day TTL) so the link works without re-typing an order number, while `/status`, `/track` and `/status/maklon` resolve independently and never expose one customer's data to another.
 
@@ -160,7 +163,8 @@ Worth calling out, because the first version of this app had a serious flaw that
 
 - **Authorisation moved to the server.** All 38 call sites that touch operational tables now use a service-role client created in exactly one place (`createServiceClient()`), used only from server code. The public anon key no longer has any access to customer data.
 - **A single guard, applied first.** `getAdminDb()` verifies the admin session and returns the service client only if it passes — so every handler begins with an explicit 401 path rather than trusting RLS to filter results.  It was added to 15 handler functions across 10 routes that previously had no authorisation check at all — including two that could rewrite an order's stage (and therefore message a customer) and one that could change the shop's WhatsApp number.
-- **The RLS hole was closed.** Migration `0027` removes the permissive policies from the four operational tables and both stage lists, verified by attempting an unauthenticated write against the live database and confirming it is rejected with a row-level security error.
+- **The RLS hole was closed.** The permissive policies were removed from the four operational tables and both stage lists, verified by attempting an unauthenticated write against the live database and confirming it is rejected with a row-level security error. The baseline schema simply never grants them: anon can read the shop identity and the stage-name lists, nothing else.
+- **RPCs are service-role only.** The notification/settings functions are `SECURITY DEFINER`, so the grants matter more than the table policies. They are revoked from `public`, `anon` and `authenticated` and granted to `service_role` — otherwise the public anon key could overwrite the WhatsApp token or claim a stage on someone else's behalf and silence their notifications.
 - **Public signup disabled**, neutralising the `authenticated`-role policies on content tables at once.
 - **Secrets stay encrypted.** The WhatsApp gateway token is stored AES-256-GCM encrypted (key from the environment, never in code), so a database dump alone doesn't expose the account.
 - **The remaining anon surface is only what has to be public:** the stage-name lists the customer status pages read, nothing else.
