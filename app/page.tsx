@@ -29,7 +29,9 @@ const FAMILY_INFO: Record<string, { unit: string }> = {
  *
  * Sebelumnya halaman ini adalah portal admin (tombol "Masuk Dashboard Pesanan").
  * Sekarang isinya informasi toko + dua hal yang dicari customer: cara pesan dan
- * cara melacak pesanan. Pintu dashboard tetap ada, tapi kecil di footer.
+ * cara melacak pesanan. Pintu dashboard SENGAJA tidak ditautkan dari sini:
+ * admin masuk langsung ke /login, supaya halaman publik tidak mengarahkan
+ * pengunjung (atau bot) ke pintu masuk panel.
  *
  * Semua teks dinamis (nama, tagline, deskripsi, nomor WA, jam operasional) dan
  * daftar produk dibaca dari sumbernya masing-masing — tidak ada yang ditulis
@@ -257,13 +259,6 @@ export default async function HomePage() {
                 >
                   WhatsApp: {formatWhatsAppDisplay(brand.whatsappNumber)}
                 </a>
-                {/* Pintu dashboard tetap ada, sengaja kecil — pengunjungnya customer */}
-                <Link
-                  href="/login"
-                  className="text-[11.5px] text-[#5f656f] hover:text-[#9aa0aa] underline-offset-4 hover:underline"
-                >
-                  Panel Admin
-                </Link>
               </div>
             </div>
           </footer>
