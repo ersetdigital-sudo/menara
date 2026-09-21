@@ -12,6 +12,7 @@ import { decryptSecret } from "@/lib/fonnte-crypto";
 import { createClient } from "@/lib/supabase/server";
 import { signTrackingToken } from "@/lib/verify-token";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAppUrl } from "@/lib/app-url";
 
 export const FONNTE_TOKEN_KEY = "fonnte_token";
 export const FONNTE_API_URL = "https://api.fonnte.com/send";
@@ -58,9 +59,7 @@ export const STAGE_TO_STATUS: Record<number, string> = Object.fromEntries(
  * progres TANPA verifikasi HP — lihat app/status/page.tsx.
  */
 export function buildTrackingUrl(orderNumber: string, token?: string): string {
-  const base = `https://www.menara.id/status?order=${encodeURIComponent(
-    orderNumber
-  )}`;
+  const base = `${getAppUrl()}/status?order=${encodeURIComponent(orderNumber)}`;
   return token ? `${base}&token=${encodeURIComponent(token)}` : base;
 }
 
@@ -70,9 +69,7 @@ export function buildTrackingUrl(orderNumber: string, token?: string): string {
  * punya halaman + token sendiri di /status/maklon.
  */
 export function buildMaklonTrackingUrl(orderNumber: string, token?: string): string {
-  const base = `https://www.menara.id/status/maklon?order=${encodeURIComponent(
-    orderNumber
-  )}`;
+  const base = `${getAppUrl()}/status/maklon?order=${encodeURIComponent(orderNumber)}`;
   return token ? `${base}&token=${encodeURIComponent(token)}` : base;
 }
 
