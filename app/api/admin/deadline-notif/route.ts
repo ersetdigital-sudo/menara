@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { sendFonnteMessage, normalizeAndValidatePhone } from "@/lib/fonnte";
 import { ORDER_STATUS_LABELS } from "@/lib/types";
 
@@ -76,22 +78,25 @@ export async function GET(req: Request) {
   const auth = req.headers.get("x-cron-secret");
   const url = new URL(req.url);
   const secretParam = url.searchParams.get("secret");
-  const fromDashboard = req.headers.get("x-from-dashboard") === "true";
 
   const secretValue = auth || secretParam;
+  const cronSecretOk = Boolean(CRON_SECRET) && secretValue === CRON_SECRET;
 
-  if (!fromDashboard && (!CRON_SECRET || secretValue !== CRON_SECRET)) {
+  // Dua jalur masuk yang sah:
+  //  - Cron Vercel, dibuktikan dengan CRON_SECRET.
+  //  - Tombol "kirim sekarang" di dashboard, dibuktikan cookie admin.
+  //
+  // Sebelumnya ceknya `!fromDashboard` dari header `x-from-dashboard`, dan
+  // header itu bisa dikirim siapa pun — jadi orang luar bisa memicu kirim WA.
+  const supabase = cronSecretOk ? createServiceClient() : await getAdminDb();
+
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(
-    supabaseUrl,
-    serviceKey || anonKey,
-    serviceKey ? { auth: { persistSession: false } } : undefined
-  );
+  // Dipertahankan dari versi lama: jalur dashboard (trigger manual) melewati
+  // gerbang "sudah kirim hari ini" dan tidak menulis flag tanggal.
+  const fromDashboard = !cronSecretOk;
 
   // 1. Ambil semua setting notif sekaligus (termasuk flag last_sent_date)
   const { settings, error: settingsErr } = await readSettings(supabase);

@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminDb } from "@/lib/admin-auth";
 import { getAllOrders, generateOrderNumber } from "@/lib/queries-orders";
 
 /**
  * GET /api/admin/orders — list all orders (admin only)
  */
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const supabase = await getAdminDb();
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,12 +19,8 @@ export async function GET() {
  * POST /api/admin/orders — create new order (admin only)
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const supabase = await getAdminDb();
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

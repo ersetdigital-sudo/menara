@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 import { triggerMaklonStageNotification } from "@/lib/fonnte";
 
 const STATUS_FROM_STEP = [
@@ -23,6 +23,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Endpoint ini juga memicu notifikasi WhatsApp ke customer — wajib admin.
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const {
     current_step,
@@ -35,15 +42,6 @@ export async function PATCH(
     customer_phone,
     design_photos,
   } = body;
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(
-    supabaseUrl,
-    serviceKey || anonKey,
-    serviceKey ? { auth: { persistSession: false } } : undefined
-  );
 
   const { data: existing, error: fetchError } = await supabase
     .from("maklon_orders")

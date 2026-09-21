@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { getAdminDb } from "@/lib/admin-auth";
 
 export async function GET(req: Request) {
-  const supabase = getSupabase();
+  // Log notifikasi memuat nomor HP customer — tidak boleh terbuka.
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit") || "50"), 100);
 

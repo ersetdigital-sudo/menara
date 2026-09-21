@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { verifyToken, getSessionFromCookie } from "@/lib/verify-token";
 
 /**
@@ -36,11 +37,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Service role: policy anon pada `orders` sudah ditutup (migrasi 0027).
+    // Otorisasi di endpoint ini adalah token sesi bertanda tangan di atas,
+    // jadi query-nya boleh memakai service role.
+    const supabase = createServiceClient();
 
     const { data: order, error: orderErr } = await supabase
       .from("orders")

@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { getAdminDb } from "@/lib/admin-auth";
 
 export async function GET() {
-  const supabase = getSupabase();
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { data, error } = await supabase
     .from("app_settings")
     .select("key, value")
@@ -35,7 +32,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabase();
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
 
   const { enabled, time, days, phones } = body;

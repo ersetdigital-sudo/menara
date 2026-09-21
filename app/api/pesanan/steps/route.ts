@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 
 function getSupabase() {
   return createClient(
@@ -21,7 +22,12 @@ export async function GET() {
 
 /** PUT — replace all steps (atomic: delete + re-insert) */
 export async function PUT(req: Request) {
-  const supabase = getSupabase();
+  // Tulis ulang daftar tahap produksi = aksi admin, bukan publik.
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { steps } = (await req.json()) as {
     steps: { name: string; position: number }[];
   };

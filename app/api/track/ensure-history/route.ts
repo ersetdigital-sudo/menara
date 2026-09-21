@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/server";
 import { ORDER_STATUS_LIST } from "@/lib/types";
 import {
   isOrderCompleted,
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  // Service role: endpoint ini juga menulis baris `order_status_history`
+  // (backfill), sedangkan policy anon sudah ditutup di migrasi 0027.
+  // Otorisasinya token sesi bertanda tangan yang diverifikasi di atas.
+  const supabase = createServiceClient();
 
   // Get order — select ALL columns so the returned order object is complete
   // (design_photos, products, deadline, etc.) and doesn't wipe out fields

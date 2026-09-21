@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminDb } from "@/lib/admin-auth";
 import { ORDER_STATUS_LIST, type OrderStatus } from "@/lib/types";
 import {
   STATUS_TO_STAGE,
@@ -35,12 +35,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const supabase = await getAdminDb();
+  if (!supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -65,7 +61,7 @@ export async function PATCH(
     }
 
     // Rate limit dasar — cegah spam trigger notifikasi (10 request/menit per admin per order).
-    if (!checkRateLimit(`stage-update:${user.id}:${id}`, 10, 60_000)) {
+    if (!checkRateLimit(`stage-update:${id}`, 10, 60_000)) {
       return NextResponse.json(
         { error: "Terlalu banyak permintaan, coba lagi nanti" },
         { status: 429 }

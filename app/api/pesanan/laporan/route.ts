@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 
 /**
  * GET /api/pesanan/laporan
@@ -27,10 +27,10 @@ import { createClient } from "@supabase/supabase-js";
 const FINAL_STATUSES = ["kirim", "selesai"];
 
 export async function GET() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const [ordersRes, historyRes] = await Promise.all([
     supabase.from("orders").select("id, order_number"),

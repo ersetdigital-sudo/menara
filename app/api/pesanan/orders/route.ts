@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 import { generateOrderNumber } from "@/lib/queries-orders";
 import { isOrderCompleted, progressPercentFromStatus, stepFromStatus } from "@/lib/order-status";
 
@@ -34,10 +34,10 @@ function mapOrder(row: any) {
 }
 
 export async function GET() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { data, error } = await supabase
     .from("orders")
@@ -52,6 +52,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const {
     id,
@@ -75,11 +80,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   // Auto-generate order number if not provided
   let orderNumber = id ? String(id).trim().toUpperCase() : "";

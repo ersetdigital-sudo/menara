@@ -3,9 +3,14 @@
  *
  * Public functions verify customer_phone before returning data.
  * Admin functions require authenticated Supabase client.
+ *
+ * Semua query di berkas ini memakai SERVICE ROLE client, karena policy anon
+ * pada `orders` / `order_status_history` sudah ditutup (migrasi 0027).
+ * Otorisasi ada di pemanggilnya: halaman tracking memverifikasi nomor HP,
+ * sedangkan endpoint dashboard memakai hasAdminAccess().
  */
 import { randomBytes as _randomBytes } from "crypto";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import type { Order, OrderStatus, OrderStatusHistory } from "@/lib/types";
 
 const crypto = { randomBytes: _randomBytes };
@@ -22,7 +27,7 @@ export async function getOrderByTracking(
   orderNumber: string,
   phone: string
 ): Promise<{ order: Order; history: OrderStatusHistory[] } | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const normalizedPhone = phone.replace(/\D/g, "");
 
@@ -66,7 +71,7 @@ export function stripWoPhoto(order: any): any {
 
 /** Fetch all orders (admin only). */
 export async function getAllOrders(): Promise<Order[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("orders")
     .select("*")
@@ -80,7 +85,7 @@ export async function getAllOrders(): Promise<Order[]> {
 export async function getOrderById(
   id: string
 ): Promise<{ order: Order; history: OrderStatusHistory[] } | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: order, error } = await supabase
     .from("orders")
@@ -129,7 +134,7 @@ function jakartaDatePart(date = new Date()): string {
  * Unique check against DB; retry max 5x on collision.
  */
 export async function generateOrderNumber(): Promise<string> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const datePart = jakartaDatePart();
 
   for (let attempt = 0; attempt < 5; attempt++) {

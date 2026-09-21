@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 import {
   STATUS_TO_STAGE,
   triggerStageNotification,
@@ -25,13 +25,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Endpoint ini memicu notifikasi WhatsApp ke customer, jadi WAJIB admin.
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { current_step, note, courier, tracking_number, deadline, wo_photos, customer_name, customer_phone, design_photos } = body;
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   // Rate limit dasar per order — cegah spam trigger notifikasi.
   if (!checkRateLimit(`stage-update:${id}`, 10, 60_000)) {

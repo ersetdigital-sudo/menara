@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/server";
 import { verifyToken } from "@/lib/verify-token";
 
 /**
@@ -227,7 +228,10 @@ async function loadBrand(): Promise<{ name: string; whatsapp_number: string }> {
 }
 
 async function loadMaklonOrder(orderNumber: string) {
-  const supabase = getSupabase();
+  // `maklon_orders` tidak lagi bisa dibaca anon (migrasi 0027), jadi baca
+  // lewat service role di server. Halaman ini publik — data yang ditampilkan
+  // dibatasi lewat SAFE_COLUMNS, bukan lewat RLS.
+  const supabase = createServiceClient();
 
   const { data: order } = await supabase
     .from("maklon_orders")

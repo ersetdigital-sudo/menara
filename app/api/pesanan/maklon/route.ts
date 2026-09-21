@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminDb } from "@/lib/admin-auth";
 
 const MAKLON_STATUS_LIST = [
   "layout",
@@ -56,17 +56,6 @@ function mapOrder(row: any) {
   };
 }
 
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(
-    supabaseUrl,
-    serviceKey || anonKey,
-    serviceKey ? { auth: { persistSession: false } } : undefined
-  );
-}
-
 const CHARSET = "ACDEFGHJKMNPQRSTUVWXYZ23456789";
 
 function randomCode(len = 4): string {
@@ -100,7 +89,11 @@ async function generateMaklonNumber(supabase: any): Promise<string> {
 }
 
 export async function GET() {
-  const supabase = getSupabase();
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { data, error } = await supabase
     .from("maklon_orders")
     .select("*")
@@ -114,6 +107,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const supabase = await getAdminDb();
+  if (!supabase) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const {
     id,
@@ -137,8 +135,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
-  const supabase = getSupabase();
 
   let orderNumber = id ? String(id).trim().toUpperCase() : "";
   if (!orderNumber) {
