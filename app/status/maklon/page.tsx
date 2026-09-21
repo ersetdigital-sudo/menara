@@ -1,0 +1,511 @@
+import type { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js";
+import { verifyToken } from "@/lib/verify-token";
+
+/**
+ * Halaman tracking publik untuk pesanan MAKLON.
+ *
+ * Dipakai oleh link di notifikasi WhatsApp (`buildMaklonTrackingUrl`).
+ * Aksesnya pakai token HMAC 30 hari yang sama dengan link jersey
+ * (lib/verify-token) — kalau token tidak ada/kedaluwarsa, customer
+ * diarahkan hubungi CS, bukan jatuh ke halaman "pesanan tidak ditemukan".
+ *
+ * Halaman ini SENGAJA terpisah dari /status (yang khusus pesanan jersey,
+ * 11 tahap, dan punya alur verifikasi nomor HP sendiri) supaya alur jersey
+ * tidak ikut berubah.
+ */
+
+export const metadata: Metadata = {
+  title: "Status Pesanan Maklon — MENARA",
+  description: "Pantau progres produksi pesanan maklon kamu.",
+  robots: { index: false, follow: false },
+};
+
+const DEFAULT_STEP_NAMES = [
+  "Layout",
+  "Profing Warna",
+  "Cutting Bahan",
+  "Press Sublime",
+  "QC",
+  "Kirim",
+];
+
+const STEP_PROGRESS: Record<number, number> = {
+  1: 17,
+  2: 33,
+  3: 50,
+  4: 67,
+  5: 83,
+  6: 100,
+};
+
+const BRAND_FALLBACK = { name: "MENARA", whatsapp_number: "628115491117" };
+
+type MaklonProduct = { name?: string; sizes?: { size?: string; qty?: number }[] };
+
+type MaklonOrderRow = {
+  order_number: string;
+  customer_name: string;
+  customer_city: string | null;
+  product_type: string | null;
+  quantity: number | null;
+  sizes: string | null;
+  material: string | null;
+  products: MaklonProduct[] | null;
+  design_photos: unknown;
+  design_notes: string | null;
+  current_status: string;
+  current_stage: number | null;
+  courier: string | null;
+  tracking_number: string | null;
+  deadline: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+/** Ambil kolom yang aman ditampilkan (wo_photos & catatan internal tidak diikutkan). */
+const SAFE_COLUMNS = [
+  "order_number",
+  "customer_name",
+  "customer_city",
+  "product_type",
+  "quantity",
+  "sizes",
+  "material",
+  "products",
+  "design_photos",
+  "design_notes",
+  "current_status",
+  "current_stage",
+  "courier",
+  "tracking_number",
+  "deadline",
+  "created_at",
+  "updated_at",
+].join(",");
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "-";
+  const date = d.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+  const time = d.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
+  return `${date}, ${time} WIB`;
+}
+
+function photoUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((p) => (typeof p === "string" ? p : ((p as { url?: string })?.url ?? "")))
+    .filter((url): url is string => typeof url === "string" && url.length > 0);
+}
+
+function ProductList({ products, fallbackName, fallbackQty }: {
+  products: MaklonProduct[] | null;
+  fallbackName: string | null;
+  fallbackQty: number | null;
+}) {
+  if (!products || products.length === 0) {
+    return (
+      <p className="trk-cell-value">
+        {fallbackName || "-"}
+        {fallbackQty ? ` - ${fallbackQty} pcs` : ""}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      {products.map((p, i) => {
+        const qty = (p.sizes || []).reduce((acc, s) => acc + (s.qty || 0), 0);
+        return (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2.5"
+          >
+            <span className="text-[14px] font-medium">{p.name || "-"}</span>
+            <span className="dpo-mono text-[14px] text-[#FFE500]">{qty} pcs</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="trk-card p-6 sm:p-7">
+      <p className="dpo-kicker">{title}</p>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function Shell({ children, csHref }: { children: React.ReactNode; csHref: string }) {
+  return (
+    <div className="trk-bg min-h-screen">
+      <div className="trk-grid min-h-screen">
+        <div className="trk-glow">
+          <header className="sticky top-0 z-30 border-b border-white/[.07] bg-[rgba(10,10,11,.72)] backdrop-blur-xl">
+            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-3.5">
+              <div className="flex items-center gap-3">
+                <a href="/" className="shrink-0" aria-label="Kembali ke beranda">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo-menara.png"
+                    alt="MENARA"
+                    style={{ height: "32px", width: "auto" }}
+                    className="rounded-lg"
+                  />
+                </a>
+                <div className="leading-tight">
+                  <p className="trk-display text-[14.5px] font-semibold uppercase tracking-wide sm:text-[15px]">
+                    MENARA
+                  </p>
+                  <p className="text-[10.5px] text-[#6f757c] sm:text-[11px]">
+                    Pabrik Jersey Custom Full Printing
+                  </p>
+                </div>
+              </div>
+              <a
+                href={csHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-white/[.12] bg-white/5 px-4 py-2 text-[13px] font-medium text-[#979ba4] hover:bg-white/10 hover:text-white transition"
+              >
+                Hubungi CS
+              </a>
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-3xl px-4 pb-20 sm:px-6">{children}</main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+/** Nama toko + nomor WA CS dari pengaturan brand (fallback ke default). */
+async function loadBrand(): Promise<{ name: string; whatsapp_number: string }> {
+  const { data } = await getSupabase()
+    .from("brand")
+    .select("name, whatsapp_number")
+    .eq("id", 1)
+    .maybeSingle();
+
+  return {
+    name: data?.name || BRAND_FALLBACK.name,
+    whatsapp_number: data?.whatsapp_number || BRAND_FALLBACK.whatsapp_number,
+  };
+}
+
+async function loadMaklonOrder(orderNumber: string) {
+  const supabase = getSupabase();
+
+  const { data: order } = await supabase
+    .from("maklon_orders")
+    .select(SAFE_COLUMNS)
+    .eq("order_number", orderNumber)
+    .maybeSingle<MaklonOrderRow>();
+
+  if (!order) return null;
+
+  const { data: steps } = await supabase
+    .from("maklon_steps")
+    .select("name, position")
+    .order("position", { ascending: true });
+
+  const stepNames =
+    steps && steps.length > 0
+      ? steps.map((s) => String(s.name))
+      : DEFAULT_STEP_NAMES;
+
+  return { order, stepNames };
+}
+
+export default async function MaklonStatusPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string; token?: string }>;
+}) {
+  const { order: orderParam, token } = await searchParams;
+  const orderNumber = (orderParam || "").trim().toUpperCase();
+  const session = token ? verifyToken(token) : null;
+  const authorized = !!session && !!orderNumber && session.orderId === orderNumber;
+
+  const brand = await loadBrand();
+  // Nomor dari pengaturan brand formatnya lokal (08...), wa.me butuh kode negara.
+  const rawPhone = (brand.whatsapp_number || BRAND_FALLBACK.whatsapp_number).replace(/[^0-9]/g, "");
+  const waPhone = rawPhone.startsWith("0") ? `62${rawPhone.slice(1)}` : rawPhone;
+  const csHref = `https://wa.me/${waPhone}?text=${encodeURIComponent(
+    `Halo ${brand.name}, saya mau tanya progres pesanan maklon saya${orderNumber ? ` (${orderNumber})` : ""}.`
+  )}`;
+
+  const result = authorized ? await loadMaklonOrder(orderNumber) : null;
+
+  if (!authorized) {
+    return (
+      <Shell csHref={csHref}>
+        <div className="pt-7 sm:pt-12">
+          <InfoCard title="Status Pesanan Maklon">
+            <h1 className="trk-display text-[22px] leading-tight">Link tidak valid atau kedaluwarsa</h1>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#979ba4]">
+              Link ini cuma bisa dibuka dari pesan WhatsApp resmi kami dan berlaku 30 hari.
+              Kalau link-nya sudah lama, minta link baru ke CS ya — atau langsung tanya
+              progres pesanan kamu.
+            </p>
+            <a
+              href={csHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="trk-btn-accent mt-6 inline-flex items-center gap-2 px-6 py-3.5 text-[14px]"
+            >
+              Chat CS
+            </a>
+          </InfoCard>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!result) {
+    return (
+      <Shell csHref={csHref}>
+        <div className="pt-7 sm:pt-12">
+          <InfoCard title="Status Pesanan Maklon">
+            <h1 className="trk-display text-[22px] leading-tight">Pesanan tidak ditemukan</h1>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#979ba4]">
+              Pesanan <span className="dpo-mono text-[#e8ebe9]">{orderNumber}</span> tidak ada di
+              sistem kami. Pastikan nomornya benar atau hubungi CS untuk dibantu cek ulang.
+            </p>
+            <a
+              href={csHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="trk-btn-accent mt-6 inline-flex items-center gap-2 px-6 py-3.5 text-[14px]"
+            >
+              Chat CS
+            </a>
+          </InfoCard>
+        </div>
+      </Shell>
+    );
+  }
+
+  const { order, stepNames } = result;
+  const totalSteps = stepNames.length;
+  const step = Math.min(Math.max(order.current_stage || 1, 1), totalSteps);
+  const isDone = order.current_status === "selesai";
+  const hasTracking = !!(order.courier && order.tracking_number);
+  const pct = isDone || (step >= totalSteps && hasTracking)
+    ? 100
+    : STEP_PROGRESS[step] ?? 0;
+  const stageName = stepNames[step - 1] || `Tahap ${step}`;
+  const designPhotos = photoUrls(order.design_photos);
+
+  return (
+    <Shell csHref={csHref}>
+      <section className="pt-7 sm:pt-12">
+        <p className="dpo-kicker">Status Pesanan Maklon</p>
+        <h1 className="dpo-h1 mt-2.5">
+          {isDone
+            ? "Pesanan maklon kamu sudah selesai"
+            : step >= totalSteps
+              ? "Pesanan maklon kamu siap dikirim"
+              : "Pesanan maklon kamu sedang kami kerjakan"}
+        </h1>
+        <p className="mt-3 text-[14px] text-[#979ba4]">
+          Nomor <span className="dpo-mono text-[#e8ebe9]">{order.order_number}</span> -{" "}
+          {order.customer_name}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          <span className={`trk-pill ${isDone ? "trk-pill-shipped" : "trk-pill-active"}`}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 999,
+                background: "currentColor",
+                display: "inline-block",
+              }}
+            />
+            {isDone ? "Selesai" : stageName}
+          </span>
+          <span className="text-[12.5px] text-[#6f757c]">
+            Tahap {step} dari {totalSteps}
+          </span>
+        </div>
+
+        <div className="trk-bar mt-6">
+          <i style={{ width: `${pct}%` }} />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[12.5px] text-[#6f757c]">
+          <span className="dpo-mono">{pct}%</span>
+          <span>Update terakhir {formatDateTime(order.updated_at)}</span>
+        </div>
+      </section>
+
+      {/* TIMELINE */}
+      <section className="mt-10">
+        <p className="dpo-kicker">Tahapan Produksi</p>
+        <div className="trk-card mt-3 p-6 sm:p-7">
+          {stepNames.map((name, i) => {
+            const pos = i + 1;
+            const state = pos < step ? "trk-done" : pos === step ? "trk-current" : "trk-todo";
+            return (
+              <div key={pos} className={`trk-step ${state}`}>
+                <div className="trk-dot">
+                  {pos < step ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : (
+                    pos
+                  )}
+                </div>
+                <p className="trk-label text-[15px]">{name}</p>
+                <p className="mt-1 text-[12.5px] text-[#6f757c]">
+                  {pos < step ? "Selesai" : pos === step ? (isDone ? "Selesai" : "Sedang dikerjakan") : "Menunggu"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* RINCIAN */}
+      <section className="mt-10">
+        <p className="dpo-kicker">Rincian Pesanan</p>
+        <div className="trk-card mt-3 overflow-hidden">
+          <div className="grid grid-cols-2 border-b border-white/[.07]">
+            <div className="trk-cell border-r border-white/[.07]">
+              <p className="trk-cell-label">Tahap Sekarang</p>
+              <p className="trk-cell-value">{isDone ? "Selesai" : stageName}</p>
+            </div>
+            <div className="trk-cell">
+              <p className="trk-cell-label">Deadline</p>
+              <p className="trk-cell-value">{formatDate(order.deadline)}</p>
+            </div>
+          </div>
+
+          <div className="trk-cell border-b border-white/[.07]">
+            <p className="trk-cell-label">Produk</p>
+            <ProductList
+              products={order.products}
+              fallbackName={order.product_type}
+              fallbackQty={order.quantity}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 border-b border-white/[.07]">
+            <div className="trk-cell border-r border-white/[.07]">
+              <p className="trk-cell-label">Jumlah</p>
+              <p className="trk-cell-value dpo-mono">{order.quantity ?? "-"} pcs</p>
+            </div>
+            <div className="trk-cell">
+              <p className="trk-cell-label">Tanggal Order</p>
+              <p className="trk-cell-value">{formatDate(order.created_at)}</p>
+            </div>
+          </div>
+
+          {/* Baris pengiriman hanya muncul kalau resinya memang ada. */}
+          {hasTracking && (
+            <div className="grid grid-cols-2 border-b border-white/[.07]">
+              <div className="trk-cell border-r border-white/[.07]">
+                <p className="trk-cell-label">Ekspedisi</p>
+                <p className="trk-cell-value">{order.courier || "-"}</p>
+              </div>
+              <div className="trk-cell">
+                <p className="trk-cell-label">No. Resi</p>
+                <p className="trk-cell-value dpo-mono">{order.tracking_number || "-"}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* DESIGN */}
+      {designPhotos.length > 0 && (
+        <section className="mt-10">
+          <p className="dpo-kicker">Preview Design</p>
+          <div className="trk-card mt-3 p-4 sm:p-5">
+            <div className="flex flex-wrap gap-3">
+              {designPhotos.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block h-[104px] w-[104px] overflow-hidden rounded-xl border border-white/10"
+                  title="Klik untuk lihat ukuran penuh"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Preview design ${i + 1}`}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CATATAN */}
+      {order.design_notes && (
+        <section className="mt-10">
+          <p className="dpo-kicker">Catatan untuk Kamu</p>
+          <div className="trk-update-box mt-3">
+            <p className="text-[14px] leading-relaxed text-[#e8ebe9]">{order.design_notes}</p>
+          </div>
+        </section>
+      )}
+
+      <section className="mt-10">
+        <div className="trk-card p-6 text-center sm:p-7">
+          <p className="text-[14px] leading-relaxed text-[#979ba4]">
+            Ada yang mau ditanyakan soal pesanan ini? CS kami siap bantu.
+          </p>
+          <div className="mt-5 flex justify-center">
+            <a
+              href={csHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FFE500] px-8 py-3.5 text-[15px] font-semibold text-black transition hover:-translate-y-px hover:bg-[#FFE500] sm:w-auto"
+            >
+              Chat CS
+            </a>
+          </div>
+        </div>
+      </section>
+    </Shell>
+  );
+}
