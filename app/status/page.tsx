@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { WA_NUMBER } from "@/lib/data";
 
 import {
   ORDER_STATUS_LABELS,
@@ -109,7 +110,7 @@ function StatusContent() {
   const [order, setOrder] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [brand, setBrand] = useState<{ name: string; whatsapp_number: string; tagline: string }>({ name: "MENARA", whatsapp_number: "628115491117", tagline: "" });
+  const [brand, setBrand] = useState<{ name: string; whatsapp_number: string; tagline: string }>({ name: "MENARA", whatsapp_number: WA_NUMBER, tagline: "" });
   const [steps, setSteps] = useState<{ name: string; position: number }[]>([]);
   const pctRef = useRef<HTMLDivElement>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);

@@ -34,6 +34,7 @@ Semua file dijalankan manual lewat Supabase **SQL Editor** (atau `psql`), tidak 
 | `0004_perbaiki_notifikasi_tahap.sql` | **Perbaikan bug produksi**: notifikasi WA tahap pesanan jersey tidak pernah terkirim karena tabel log-nya terhapus di migrasi lama |
 | `0005_rapikan_akses_warisan.sql` | Cabut policy & grant warisan, buang helper + index duplikat |
 | `0006_selaraskan_nama_tahap.sql` | **Perbaikan bug**: `production_steps` masih 9 nama pipeline lama, bikin customer melihat "Tahap 3/9" sementara dashboard "4/11" |
+| `0007_nomor_wa_resmi.sql` | Isi nomor WhatsApp resmi di baris `brand` (sebelumnya placeholder, jadi tombol "Hubungi CS" customer mengarah ke nomor kosong). Mengubah nomor berikutnya cukup lewat menu Pengaturan |
 
 ## Tabel (11)
 

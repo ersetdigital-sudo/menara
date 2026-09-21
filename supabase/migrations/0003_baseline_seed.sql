@@ -20,7 +20,8 @@ values (
   'MENARA',
   E'Pabrik Jersey Custom Full Printing.\nDesain bebas, harga pabrik, kirim se-Indonesia.',
   'MENARA — pabrik jersey custom full printing. Desain bebas, harga mulai 85rb, kirim se-Indonesia. Konsultasi gratis via WhatsApp.',
-  '6281234567890',
+  -- Nomor resmi (dulu placeholder 6281234567890; lihat 0007_nomor_wa_resmi.sql)
+  '628115491117',
   '/logo-menara.png'
 )
 on conflict (id) do update set

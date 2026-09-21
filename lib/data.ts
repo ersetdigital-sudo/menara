@@ -5,11 +5,17 @@
  * tidak ada. Isi sebenarnya dikelola dari dashboard (menu Pengaturan) —
  * berkas ini cuma jaring pengaman supaya halaman depan dan halaman tracking
  * tetap tampil, bukan sumber kebenaran saat runtime.
- *
- * TODO: ganti `whatsappNumber` di sini DAN di tabel `brand` dengan nomor
- * resmi MENARA. Nilainya masih placeholder.
  */
 import type { Brand } from "@/lib/types";
+
+/**
+ * Nomor WhatsApp resmi MENARA — satu-satunya tempat nomor cadangan ditulis.
+ *
+ * Dipakai halaman tracking, `/api/brand`, dan `wa.ts` saat nilai dari tabel
+ * `brand` belum/tidak terbaca. Nomor yang tampil saat normal tetap dari tabel
+ * `brand` (menu Pengaturan admin), jadi mengganti nomor tidak perlu deploy.
+ */
+export const WA_NUMBER = "628115491117";
 
 export const brand: Brand = {
   name: "MENARA",
@@ -18,6 +24,6 @@ export const brand: Brand = {
     "Tempat Bikin Jersey Futsal Custom.\nDesain bebas, harga pabrik, kirim se-Indonesia.",
   description:
     "MENARA — tempat bikin jersey futsal custom full printing. Desain bebas, harga mulai 85rb, kirim se-Indonesia. Konsultasi gratis via WhatsApp.",
-  whatsappNumber: "6281234567890",
+  whatsappNumber: WA_NUMBER,
   logoPath: "/logo-menara.png",
 };

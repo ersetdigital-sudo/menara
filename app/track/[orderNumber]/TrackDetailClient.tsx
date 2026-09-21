@@ -33,6 +33,7 @@ import {
 } from "@/lib/order-status";
 import { buildWhatsAppLink } from "@/lib/wa";
 import { formatDateTimeID } from "@/lib/format-date";
+import { WA_NUMBER } from "@/lib/data";
 
 /**
  * Ikon per tahap — SVG (lucide), bukan emoji: emoji dirender berbeda-beda di
@@ -189,7 +190,7 @@ function OrderDetailView({
   const progress = progressPercentFromStatus(order.current_status);
   const nextEstimate = nextStageLabel(order.current_status);
   const waLink = buildWhatsAppLink(
-    "628115491117",
+    WA_NUMBER,
     `Halo MENARA, saya mau tanya soal pesanan ${orderNumber}`
   );
   const courierLink =

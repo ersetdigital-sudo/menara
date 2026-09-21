@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { WA_NUMBER } from "@/lib/data";
 
 
 export default function TrackPage() {
@@ -10,7 +11,7 @@ export default function TrackPage() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [brand, setBrand] = useState<{ name: string; whatsapp_number: string }>({ name: "MENARA", whatsapp_number: "628115491117" });
+  const [brand, setBrand] = useState<{ name: string; whatsapp_number: string }>({ name: "MENARA", whatsapp_number: WA_NUMBER });
 
   useEffect(() => {
     fetch("/api/brand")

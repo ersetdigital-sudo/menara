@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { verifyToken } from "@/lib/verify-token";
 import { MAKLON_STAGES, MAKLON_STEP_PROGRESS } from "@/lib/maklon-status";
 import { formatDateTimeWIB, formatShortDateID } from "@/lib/format-date";
+import { WA_NUMBER } from "@/lib/data";
 
 /**
  * Halaman tracking publik untuk pesanan MAKLON.
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
 /** Nama tahap cadangan bila tabel `maklon_steps` belum berisi apa pun. */
 const DEFAULT_STEP_NAMES = MAKLON_STAGES.map((stage) => stage.label);
 
-const BRAND_FALLBACK = { name: "MENARA", whatsapp_number: "628115491117" };
+const BRAND_FALLBACK = { name: "MENARA", whatsapp_number: WA_NUMBER };
 
 type MaklonProduct = { name?: string; sizes?: { size?: string; qty?: number }[] };
 
