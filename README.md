@@ -47,9 +47,9 @@ This platform turns that flow into a tracked, self-reporting pipeline: the momen
 
 ## Screenshots
 
-**Landing page**
+**Home / entry point**
 
-![Landing page](docs/screenshots/01-landing-page.png)
+![Home](docs/screenshots/01-home.png)
 
 **Orders dashboard**
 
@@ -103,7 +103,7 @@ A single Next.js App Router application. Server Components read data directly; m
 
 ```
 Browser
-  dashboards · tracking pages · public landing
+  dashboards · tracking pages · public entry page
         │
         ▼
 Next.js 15 (App Router) on Vercel
@@ -115,18 +115,17 @@ Next.js 15 (App Router) on Vercel
         │
         ▼
 Supabase (Postgres)
-  operational tables   RLS enabled, zero anon policies — service role only
-  content tables       public read, no public write
+  all tables           RLS enabled, zero anon policies — service role only
+  public read          only the stage-name lists the status pages need
   RPCs                 atomic stage-claim for notifications
         │
         ├──▶ Fonnte (WhatsApp gateway)
-        ├──▶ Cloudinary (media)
-        └──▶ Meta Conversions API (ads)
+        └──▶ Cloudinary (media)
 ```
 
 ### Data model
 
-The schema is built from 26 versioned SQL migrations (`0001` → `0027`), applied in order. The core of it:
+The schema is built from 29 versioned SQL migrations (`0001` → `0029`), applied in order. Ten tables remain — everything that served the marketing site was dropped once the platform was scoped to operations. The core of it:
 
 | Table | Holds |
 |---|---|
@@ -151,8 +150,6 @@ A few parts that were genuinely interesting to get right.
 
 **Order numbers that survive being read aloud.** `MENARA` + `YYMMDD` + four characters drawn from a CSPRNG, with the ambiguous characters `B I O L 0 1` removed from the alphabet. Uniqueness is checked against the database with retry, because customers read these numbers over the phone.
 
-**Ad attribution without double counting.** The Meta Conversions API relay mirrors browser pixel events with the same event ID, so Meta deduplicates them into a single counted conversion — raising match quality without inflating reported numbers.
-
 ## Security model
 
 Worth calling out, because the first version of this app had a serious flaw that the rewrite fixed.
@@ -166,7 +163,7 @@ Worth calling out, because the first version of this app had a serious flaw that
 - **The RLS hole was closed.** Migration `0027` removes the permissive policies from the four operational tables and both stage lists, verified by attempting an unauthenticated write against the live database and confirming it is rejected with a row-level security error.
 - **Public signup disabled**, neutralising the `authenticated`-role policies on content tables at once.
 - **Secrets stay encrypted.** The WhatsApp gateway token is stored AES-256-GCM encrypted (key from the environment, never in code), so a database dump alone doesn't expose the account.
-- **The remaining anon surface is only what has to be public:** the landing page content and stage-name lists, both read-only.
+- **The remaining anon surface is only what has to be public:** the stage-name lists the customer status pages read, nothing else.
 
 ## Tech stack
 
@@ -182,7 +179,7 @@ Worth calling out, because the first version of this app had a serious flaw that
 
 ## Status
 
-Shipped to production and in daily operational use. The landing page and product catalogue modules are the next milestone.
+Shipped to production and in daily operational use. The platform deliberately covers operations only — no storefront, no catalogue — so the data model stays as small as the work it supports.
 
 ## Author
 
