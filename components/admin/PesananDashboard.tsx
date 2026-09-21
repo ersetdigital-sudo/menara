@@ -13,6 +13,11 @@ import {
   formatTimeID,
   monthKeyID,
 } from "@/lib/format-date";
+import {
+  DEFAULT_PRODUCTS,
+  mergeProductOptions,
+  rememberProducts,
+} from "@/lib/product-options";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Search, AlertTriangle } from "lucide-react";
 
@@ -87,16 +92,15 @@ const VIEW_META: Record<ViewKey, { crumb: string; title: string }> = {
   setting: { crumb: "Data", title: "Pengaturan" },
 };
 
-/* ── Laporan: filter bulan, kategori & kapasitas ───────────────────────── */
+/* ── Laporan: filter bulan, produk & kapasitas ─────────────────────────── */
 
 const DEFAULT_KAPASITAS = 2500;
 const MONTH_NAMES = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
-/** Urutan tetap di chart/tabel; kategori lain menyusul di bawahnya. */
-const CAT_ORDER = ["Atasan", "Setelan"];
-const CAT_COLORS = ["#0C0C0D", "#7FA37B", "#FFE500", "#8A8A8F"];
+/** Palet donut/legend; diulang kalau jumlah produk melebihi jumlah warna. */
+const CAT_COLORS = ["#0C0C0D", "#7FA37B", "#FFE500", "#8A8A8F", "#4E7A6B", "#A88C36"];
 
 /** "2026-09" dari created_at, menurut zona Asia/Jakarta (bukan zona browser). */
 const monthKeyOf = (iso: string) => monthKeyID(iso);
@@ -118,12 +122,17 @@ function orderPcs(o: OrderData): number {
 }
 
 /**
- * Pecah satu order jadi bucket kategori (Atasan / Setelan / Lainnya).
+ * Pecah satu order jadi bucket per PRODUK (label = nama produk apa adanya).
  *
  * Sumber utama adalah `products[]` karena satu order bisa berisi campuran
- * Atasan + Setelan. Kalau `products` kosong (order lama), fallback ke prefix
- * `product_name`. Order yang tidak bisa diklasifikasikan masuk "Lainnya"
- * supaya total pcs tetap utuh dan tidak ada angka yang hilang.
+ * produk. Labelnya diambil apa adanya — TIDAK ditebak dari prefix nama seperti
+ * sebelumnya, karena daftar produk di dashboard bebas diisi admin
+ * (mis. "Jersey Home"). Dulu semua nama yang tidak diawali "Atasan"/"Setelan"
+ * dipaksa masuk "Lainnya", jadi laporan tidak pernah cocok dengan produk
+ * yang benar-benar dijual.
+ *
+ * Order lama tanpa rincian `products` dibebankan seluruhnya ke satu label dari
+ * `product_name` supaya total pcs tetap utuh dan tidak ada angka yang hilang.
  */
 function bucketOrder(o: OrderData): Record<string, number> {
   const out: Record<string, number> = {};
@@ -133,12 +142,7 @@ function bucketOrder(o: OrderData): Record<string, number> {
   for (const p of products) {
     const qty = (p.sizes || []).reduce((a, s) => a + (Number(s.qty) || 0), 0);
     if (!qty) continue;
-    const name = (p.name || "").toLowerCase();
-    const label = name.startsWith("atasan")
-      ? "Atasan"
-      : name.startsWith("setelan")
-        ? "Setelan"
-        : "Lainnya";
+    const label = productLabel(p.name);
     out[label] = (out[label] || 0) + qty;
     assigned += qty;
   }
@@ -147,17 +151,14 @@ function bucketOrder(o: OrderData): Record<string, number> {
   const total = orderPcs(o);
   if (total <= 0) return out;
 
-  const type = (o.product_name || "").toLowerCase();
-  const hasAtasan = type.includes("atasan");
-  const hasSetelan = type.includes("setelan");
-  // Kalau product_name memuat keduanya, qty-nya tidak bisa dipecah → Lainnya.
-  if (hasAtasan !== hasSetelan) {
-    const label = hasAtasan ? "Atasan" : "Setelan";
-    out[label] = (out[label] || 0) + total;
-  } else {
-    out.Lainnya = (out.Lainnya || 0) + total;
-  }
+  const label = productLabel(o.product_name);
+  out[label] = (out[label] || 0) + total;
   return out;
+}
+
+/** Label produk untuk laporan; nama kosong tetap dihitung, tidak dibuang. */
+function productLabel(name: string | null | undefined): string {
+  return (name || "").trim() || "Tanpa nama produk";
 }
 
 /* ── Customer: identitas berdasarkan nomor HP ──────────────────────────── */
@@ -1849,7 +1850,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
   const excess = Math.max(totalPcs - capacity, 0);
   const capClass = isOver ? "danger" : isWarn ? "warn" : "produksi";
 
-  // Penjualan per kategori (Atasan / Setelan / Lainnya)
+  // Penjualan per produk — label = nama produk apa adanya, urut pcs terbanyak
   const cats = useMemo(() => {
     const acc: Record<string, number> = {};
     monthOrders.forEach((o) => {
@@ -1858,15 +1859,14 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
         acc[k] = (acc[k] || 0) + b[k];
       });
     });
-    const head = CAT_ORDER.filter((c) => (acc[c] || 0) > 0);
-    const tail = Object.keys(acc)
-      .filter((c) => CAT_ORDER.indexOf(c) < 0 && acc[c] > 0)
-      .sort((a, b) => acc[b] - acc[a]);
-    return head.concat(tail).map((label, i) => ({
-      label,
-      pcs: acc[label],
-      color: CAT_COLORS[i % CAT_COLORS.length],
-    }));
+    return Object.keys(acc)
+      .filter((label) => acc[label] > 0)
+      .sort((a, b) => acc[b] - acc[a] || a.localeCompare(b, "id"))
+      .map((label, i) => ({
+        label,
+        pcs: acc[label],
+        color: CAT_COLORS[i % CAT_COLORS.length],
+      }));
   }, [monthOrders]);
 
   const catTotal = cats.reduce((a, c) => a + c.pcs, 0);
@@ -2011,7 +2011,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
         </div>
         <span className="flex-1" />
         <span className="text-[11.5px] text-[var(--pas-muted)] font-medium">
-          Berlaku untuk Ringkasan, Penjualan per Kategori, Kapasitas &amp; Order per Minggu
+          Berlaku untuk Ringkasan, Penjualan per Produk, Kapasitas &amp; Order per Minggu
         </span>
       </div>
 
@@ -2081,10 +2081,10 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
         </div>
       </div>
 
-      {/* Penjualan per Kategori */}
+      {/* Penjualan per Produk */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[18px] font-semibold text-ink">Penjualan per Kategori</h2>
+          <h2 className="text-[18px] font-semibold text-ink">Penjualan per Produk</h2>
           <span className="text-[13px] text-[var(--pas-muted)]">
             Total terjual — <b>{periode}</b>
           </span>
@@ -2093,8 +2093,8 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
         <div className="grid lg:grid-cols-[1.05fr_1fr] gap-4">
           <div className="pas-card p-[18px] flex flex-col">
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[13px] font-semibold text-ink">Proporsi Kategori</p>
-              <span className="text-[11px] text-[var(--pas-muted)]">Atasan vs Setelan</span>
+              <p className="text-[13px] font-semibold text-ink">Proporsi Produk</p>
+              <span className="text-[11px] text-[var(--pas-muted)]">per nama produk</span>
             </div>
 
             {catTotal === 0 ? (
@@ -2110,7 +2110,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
                       width="100%"
                       height="100%"
                       role="img"
-                      aria-label="Donut proporsi kategori"
+                      aria-label="Donut proporsi produk"
                     >
                       <circle cx="60" cy="60" r="46" fill="none" stroke="#ECECEB" strokeWidth="15" />
                       <g transform="rotate(-90 60 60)">{donutSegments}</g>
@@ -2153,7 +2153,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
                     </div>
                   ))}
                   <p className="text-[11.5px] text-[var(--pas-muted)] mt-3.5">
-                    {cats.length} kategori aktif dari {monthOrders.length} pesanan pada periode ini.
+                    {cats.length} produk aktif dari {monthOrders.length} pesanan pada periode ini.
                   </p>
                 </div>
               </>
@@ -2187,7 +2187,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
                 <table className="pas-tbl pas-tbl-static">
                   <thead>
                     <tr>
-                      <th>Kategori</th>
+                      <th>Produk</th>
                       <th className="num">Pcs</th>
                       <th className="num">% total</th>
                     </tr>
@@ -2202,7 +2202,7 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
                     )}
                     {cats.map((c) => (
                       <tr key={c.label}>
-                        <td>{CAT_ORDER.indexOf(c.label) >= 0 ? <b>{c.label}</b> : c.label}</td>
+                        <td>{c.label}</td>
                         <td className="num">{nf(c.pcs)}</td>
                         <td className="num">{pctOf(c.pcs, catTotal)}%</td>
                       </tr>
@@ -2218,8 +2218,9 @@ function ViewLaporan({ orders }: { orders: OrderData[] }) {
                 </table>
               </div>
               <p className="text-[11px] text-[var(--pas-muted)] mt-3">
-                Hanya kategori yang ada di data pesanan yang ditampilkan. Order tanpa rincian
-                produk dihitung sebagai &ldquo;Lainnya&rdquo; agar total tetap utuh.
+                Dikelompokkan dari nama produk yang tersimpan di tiap pesanan — tidak ada
+                kategori tebakan. Order lama tanpa rincian produk dihitung pada satu baris
+                sesuai nama produknya agar total tetap utuh.
               </p>
             </div>
           </div>
@@ -3543,8 +3544,6 @@ function DetailSheet({
   const [uploadingWo, setUploadingWo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [kirimError, setKirimError] = useState("");
-  const DEFAULT_EDIT_PRODUCTS = ["Atasan Lengan Pendek", "Atasan Lengan Panjang", "Setelan Lengan Pendek", "Setelan Lengan Panjang"];
-  const [editProductOptions, setEditProductOptions] = useState<string[]>(DEFAULT_EDIT_PRODUCTS);
   const [editProductRows, setEditProductRows] = useState<{ product: string; custom: boolean; qty: string }[]>(() => {
     const initProducts = order?.products;
     if (initProducts && initProducts.length > 0) {
@@ -3579,12 +3578,6 @@ function DetailSheet({
     return () => { document.body.style.overflow = prev; };
   }, [zoomUrl]);
 
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-      if (Array.isArray(saved) && saved.length > 0) setEditProductOptions(Array.from(new Set([...DEFAULT_EDIT_PRODUCTS, ...saved])));
-    } catch {}
-  }, []);
   useEffect(() => {
     if (order) {
       setStep(order.current_step);
@@ -4012,8 +4005,7 @@ function EditSheet({
     deadline: order?.deadline ? order.deadline.slice(0, 10) : "",
     created_at: order?.created_at ? order.created_at.slice(0, 10) : "",
   });
-  const DEFAULT_PRODUCTS = ["Atasan Lengan Pendek", "Atasan Lengan Panjang", "Setelan Lengan Pendek", "Setelan Lengan Panjang"];
-  const [productOptions, setProductOptions] = useState<string[]>(DEFAULT_PRODUCTS);
+  const [productOptions, setProductOptions] = useState<string[]>([...DEFAULT_PRODUCTS]);
   const [designPhotos, setDesignPhotos] = useState<string[]>(order?.design_photos || []);
   const [woPhotos, setWoPhotos] = useState<string[]>(order?.wo_photos || []);
   const [uploadingDesign, setUploadingDesign] = useState(false);
@@ -4033,14 +4025,17 @@ function EditSheet({
     return [{ product: order?.product_name || "", custom: false, qty: qtyNum }];
   });
 
+  // Opsi = bawaan + produk custom perangkat ini + nama produk order yang sedang
+  // dibuka. Tanpa langkah terakhir, <select> tampil kosong kalau produk order itu
+  // ditambahkan di perangkat lain (localStorage berbeda).
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-      if (Array.isArray(saved) && saved.length > 0) {
-        setProductOptions(Array.from(new Set([...DEFAULT_PRODUCTS, ...saved])));
-      }
-    } catch {}
-  }, []);
+    setProductOptions(
+      mergeProductOptions([
+        ...(order?.products || []).map((p) => p.name),
+        order?.product_name,
+      ])
+    );
+  }, [order]);
 
   const totalQty = productRows.reduce((acc, p) => acc + (parseInt(p.qty, 10) || 0), 0);
 
@@ -4065,17 +4060,9 @@ function EditSheet({
       const combinedNames = products.map((p) => p.name).join(", ");
       const combinedSizes = products.flatMap((p) => p.sizes.map((s) => `${p.name}/${s.size}(${s.qty})`)).join(", ");
 
-      const newProducts = validRows.map((p) => p.product.trim()).filter((n) => n && !productOptions.includes(n));
-      if (newProducts.length > 0) {
-        try {
-          const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-          const merged = Array.from(new Set([...saved, ...DEFAULT_PRODUCTS, ...newProducts]));
-          localStorage.setItem("pas_product_options", JSON.stringify(merged));
-          setProductOptions(merged);
-        } catch {
-          setProductOptions((o) => [...o, ...newProducts]);
-        }
-      }
+      // Simpan produk yang dipakai supaya muncul lagi di pengisian berikutnya
+      const usedProducts = validRows.map((p) => p.product.trim());
+      if (usedProducts.length > 0) setProductOptions(rememberProducts(usedProducts));
 
       const res = await fetch(`/api/pesanan/orders/${orderId}/status`, {
         method: "PATCH",
@@ -4329,8 +4316,7 @@ function AddForm({
     deadline: "",
     created_at: new Date().toISOString().slice(0, 10),
   });
-  const DEFAULT_PRODUCTS = ["Atasan Lengan Pendek", "Atasan Lengan Panjang", "Setelan Lengan Pendek", "Setelan Lengan Panjang"];
-  const [productOptions, setProductOptions] = useState<string[]>(DEFAULT_PRODUCTS);
+  const [productOptions, setProductOptions] = useState<string[]>([...DEFAULT_PRODUCTS]);
   const [designPhotos, setDesignPhotos] = useState<string[]>([]);
   const [woPhotos, setWoPhotos] = useState<string[]>([]);
   const [uploadingDesign, setUploadingDesign] = useState(false);
@@ -4354,14 +4340,7 @@ function AddForm({
 
   // Load saved custom product options
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-      if (Array.isArray(saved) && saved.length > 0) {
-        setProductOptions(Array.from(new Set([...DEFAULT_PRODUCTS, ...saved])));
-      }
-    } catch {
-      // silent
-    }
+    setProductOptions(mergeProductOptions());
   }, []);
 
   // Load draft from localStorage on mount
@@ -4468,20 +4447,9 @@ function AddForm({
         setError(data.error || "Gagal menyimpan");
         return;
       }
-      // Persist custom products to saved options (localStorage)
-      const newProducts = validRows
-        .map((p) => p.product.trim())
-        .filter((n) => n && !productOptions.includes(n));
-      if (newProducts.length > 0) {
-        try {
-          const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-          const merged = Array.from(new Set([...saved, ...DEFAULT_PRODUCTS, ...newProducts]));
-          localStorage.setItem("pas_product_options", JSON.stringify(merged));
-          setProductOptions(merged);
-        } catch {
-          setProductOptions((o) => [...o, ...newProducts]);
-        }
-      }
+      // Simpan produk yang dipakai supaya muncul lagi di pengisian berikutnya
+      const usedProducts = validRows.map((p) => p.product.trim());
+      if (usedProducts.length > 0) setProductOptions(rememberProducts(usedProducts));
       shouldSkipDraftSaveRef.current = true;
       localStorage.removeItem(DRAFT_KEY);
       onSaved("Pesanan ditambahkan");

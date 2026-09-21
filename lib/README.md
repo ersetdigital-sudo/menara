@@ -13,6 +13,7 @@ halaman (server component), komponen dashboard, dan API routes.
 | `order-number.ts` | Generator nomor pesanan bersama jersey & maklon: `generateOrderNumber`, `jakartaDatePart`, `ORDER_NUMBER_REGEX`. Memakai CSPRNG, bukan `Math.random()` |
 | `format-date.ts` | **Satu-satunya** tempat format tanggal & jam, semuanya dipaksa zona `Asia/Jakarta`: `formatDateTimeID`, `formatShortDateTimeID`, `formatDateTimeWIB`, `formatNumericDateID`, `formatShortDateID`, `formatTimeID`, `dateKeyID` (kunci harian) dan `monthKeyID` (kunci bulanan untuk laporan) |
 | `queries-orders.ts` | Akses data order: `getOrderByTracking` (memverifikasi nomor HP sebelum mengembalikan data), `getAllOrders`, `getOrderById`, `stripWoPhoto` |
+| `product-options.ts` | Daftar pilihan produk form Pesanan & Maklon: `DEFAULT_PRODUCTS`, `mergeProductOptions(extra)`, `rememberProducts(names)`. Produk custom disimpan di `localStorage` (per perangkat), jadi form **wajib** memberi `extra` = nama produk order yang sedang dibuka |
 
 Menambah atau mengubah tahap produksi: mulai dari `types.ts` (jersey) atau
 `maklon-status.ts` (maklon). Nama tahap di pesan WhatsApp, halaman `/status`, dan daftar

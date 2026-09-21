@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { MAKLON_STAGES, maklonProgress } from "@/lib/maklon-status";
 import {
+  DEFAULT_PRODUCTS,
+  mergeProductOptions,
+  rememberProducts,
+} from "@/lib/product-options";
+import {
   formatDateTimeWIB,
   formatNumericDateID,
   formatShortDateID,
@@ -515,7 +520,6 @@ function AddForm({
   onCancel: () => void;
 }) {
   const DRAFT_KEY = "maklon_add_order_draft";
-  const DEFAULT_PRODUCTS = ["Atasan Lengan Pendek", "Atasan Lengan Panjang", "Setelan Lengan Pendek", "Setelan Lengan Panjang"];
   const [form, setForm] = useState({
     customer_name: "",
     customer_phone: "",
@@ -523,7 +527,7 @@ function AddForm({
     deadline: "",
     created_at: new Date().toISOString().slice(0, 10),
   });
-  const [productOptions, setProductOptions] = useState<string[]>(DEFAULT_PRODUCTS);
+  const [productOptions, setProductOptions] = useState<string[]>([...DEFAULT_PRODUCTS]);
   const [productRows, setProductRows] = useState<
     { product: string; custom: boolean; qty: string }[]
   >([
@@ -543,16 +547,9 @@ function AddForm({
     0
   );
 
-  // Load daftar produk custom yang pernah dipakai
+  // Load daftar produk custom yang pernah dipakai di perangkat ini
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-      if (Array.isArray(saved) && saved.length > 0) {
-        setProductOptions(Array.from(new Set([...DEFAULT_PRODUCTS, ...saved])));
-      }
-    } catch {
-      // silent
-    }
+    setProductOptions(mergeProductOptions());
   }, []);
 
   // Load draft dari localStorage saat mount
@@ -665,20 +662,9 @@ function AddForm({
         setError(data.error || "Gagal menyimpan maklon");
         return;
       }
-      // Simpan produk custom baru ke daftar opsi (localStorage, sama seperti Pesanan)
-      const newProducts = validRows
-        .map((p) => p.product.trim())
-        .filter((n) => n && !productOptions.includes(n));
-      if (newProducts.length > 0) {
-        try {
-          const saved = JSON.parse(localStorage.getItem("pas_product_options") || "[]");
-          const merged = Array.from(new Set([...saved, ...DEFAULT_PRODUCTS, ...newProducts]));
-          localStorage.setItem("pas_product_options", JSON.stringify(merged));
-          setProductOptions(merged);
-        } catch {
-          setProductOptions((o) => [...o, ...newProducts]);
-        }
-      }
+      // Simpan produk yang dipakai supaya muncul lagi di pengisian berikutnya
+      const usedProducts = validRows.map((p) => p.product.trim());
+      if (usedProducts.length > 0) setProductOptions(rememberProducts(usedProducts));
       shouldSkipDraftSaveRef.current = true;
       localStorage.removeItem(DRAFT_KEY);
       onSaved(`Maklon ${data.order?.id || ""} berhasil ditambahkan`);
