@@ -18,6 +18,7 @@ import {
   mergeProductOptions,
   rememberProducts,
 } from "@/lib/product-options";
+import { waNote } from "@/lib/notif-note";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Search, AlertTriangle } from "lucide-react";
 
@@ -1347,7 +1348,9 @@ function ViewJadwal({
       }
       onMoved();
       const laneName = LANES[laneIdx].name;
-      showToast(`${orderId} dipindah ke ${laneName}`);
+      showToast(
+        `${orderId} dipindah ke ${laneName}${waNote(data?.notification?.status)}`
+      );
     } catch {
       showToast("Gagal memindahkan pesanan, coba lagi");
     }
@@ -3701,7 +3704,7 @@ function DetailSheet({
         setKirimError(data.error || "Gagal menyimpan");
         return;
       }
-      onSaved("Perubahan tersimpan");
+      onSaved(`Perubahan tersimpan${waNote(data?.notification?.status)}`);
     } catch {
       onSaved("Gagal menyimpan");
     } finally {
@@ -3730,7 +3733,7 @@ function DetailSheet({
         setKirimError(data.error || "Gagal menyimpan");
         return;
       }
-      onSaved("Pesanan ditandai selesai");
+      onSaved(`Pesanan ditandai selesai${waNote(data?.notification?.status)}`);
     } catch {
       onSaved("Gagal menyimpan");
     } finally {

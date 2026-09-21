@@ -8,6 +8,7 @@ import {
   mergeProductOptions,
   rememberProducts,
 } from "@/lib/product-options";
+import { waNote } from "@/lib/notif-note";
 import {
   formatDateTimeWIB,
   formatNumericDateID,
@@ -1029,18 +1030,7 @@ function DetailSheet({
         return;
       }
       // Status kirim WA ikut ditampilkan biar admin tahu notif jalan atau tidak
-      const waStatus = data?.notification?.status;
-      const waNote =
-        waStatus === "sent"
-          ? " - WA terkirim"
-          : waStatus === "failed"
-            ? " - WA gagal dikirim"
-            : waStatus === "skipped_duplicate"
-              ? " - WA sudah pernah dikirim"
-              : waStatus === "log_error"
-                ? " - WA gagal dicatat"
-                : "";
-      onSaved(`Maklon ${order.id} diperbarui${waNote}`);
+      onSaved(`Maklon ${order.id} diperbarui${waNote(data?.notification?.status)}`);
     } catch {
       setError("Gagal menyimpan, coba lagi");
     } finally {
