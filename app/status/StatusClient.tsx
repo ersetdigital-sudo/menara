@@ -637,7 +637,14 @@ export default function StatusClient({
                           <p className="dpo-mono dpo-step-time">Mengikuti jadwal produksi</p>
                         ) : null}
 
-                        {st === "now" && (order.design_photos?.length ?? 0) > 0 && (
+                        {/* Preview desain nempel di TAHAP DESAIN, bukan di tahap yang
+                            sedang berjalan. Foto desain itu hasil tahap 1, jadi
+                            kalau blok ini ikut pindah tiap status di-update,
+                            customer mengira desainnya baru dikerjakan di tahap
+                            sekarang. Nama tahap diperiksa dulu, `n === 1` jadi
+                            cadangan kalau admin mengganti nama tahap pertama. */}
+                        {(statusKey === "desain" || n === 1) &&
+                          (order.design_photos?.length ?? 0) > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2.5">
                             {order.design_photos.map((url: string, di: number) => (
                               <button
