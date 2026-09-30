@@ -97,7 +97,20 @@ function stepHighlight(status: string, hasTracking: boolean): string {
  * murni melihat progres pesanan, dan kanal komunikasi sudah lewat pesan
  * WhatsApp yang dikirim otomatis tiap tahap.
  */
-export default function StatusClient() {
+export default function StatusClient({
+  initial,
+}: {
+  /**
+   * Data yang sudah dibaca server (lihat lib/status-server.ts). Kalau terisi,
+   * HTML pertama sudah memuat progres pesanan — dulu blok ini kosong sampai
+   * dua fetch berurutan selesai di browser.
+   */
+  initial?: {
+    order: any;
+    history: any[];
+    steps: { name: string; position: number }[];
+  } | null;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = (searchParams.get("order") || "").toUpperCase();
@@ -109,10 +122,12 @@ export default function StatusClient() {
   const [verifying, setVerifying] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
 
-  const [order, setOrder] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [steps, setSteps] = useState<{ name: string; position: number }[]>([]);
+  const [order, setOrder] = useState<any>(initial?.order ?? null);
+  const [history, setHistory] = useState<any[]>(initial?.history ?? []);
+  const [loaded, setLoaded] = useState(!!initial?.order);
+  const [steps, setSteps] = useState<{ name: string; position: number }[]>(
+    initial?.steps ?? []
+  );
   const pctRef = useRef<HTMLDivElement>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [lbOpen, setLbOpen] = useState(false);
@@ -131,6 +146,10 @@ export default function StatusClient() {
     // tanpa modal verifikasi HP. Kalau token invalid/expired, fetch di bawah
     // akan gagal dan fallback ke verifikasi HP seperti biasa.
     if (urlToken) sessionStorage.setItem(tokenKey, urlToken);
+
+    // Sudah dirender server — jangan ditimpa fetch ulang. Token tetap disimpan
+    // di atas supaya kunjungan berikutnya juga lolos tanpa verifikasi HP.
+    if (initial?.order) return;
 
     const token = sessionStorage.getItem(tokenKey);
 
@@ -185,7 +204,7 @@ export default function StatusClient() {
         sessionStorage.removeItem(key);
         setShowPhoneModal(true);
       });
-  }, [orderId, urlToken]);
+  }, [orderId, urlToken, initial]);
 
   // Animate progress counter
   useEffect(() => {
@@ -208,8 +227,9 @@ export default function StatusClient() {
     return () => clearInterval(iv);
   }, [order, loaded, steps]);
 
-  // Fetch production steps from DB
+  // Fetch production steps from DB — dilewati kalau server sudah mengirimnya.
   useEffect(() => {
+    if (initial?.steps?.length) return;
     fetch("/api/pesanan/steps")
       .then((r) => r.json())
       .then((d) => {
@@ -218,7 +238,7 @@ export default function StatusClient() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [initial]);
 
   useEffect(() => {
     if (!lightboxUrl) return;

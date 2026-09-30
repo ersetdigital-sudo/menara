@@ -12,6 +12,15 @@ export interface TrackSession {
 const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 jam
 export const TRACKING_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 hari utk link WA
 
+/**
+ * Masa berlaku token hasil VERIFIKASI NOMOR HP, disimpan di perangkat customer.
+ *
+ * Token ini baru terbit setelah nomor HP pesanan dicocokkan, jadi isinya sudah
+ * membuktikan kepemilikan. Masa berlakunya sengaja panjang supaya customer tidak
+ * perlu mengetik nomor HP tiap kali membuka halaman status.
+ */
+export const TRUSTED_DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 hari
+
 export function signToken(orderId: string, maxAgeMs: number = DEFAULT_MAX_AGE_MS): string {
   const payload: TrackSession = {
     orderId: orderId.toUpperCase(),
@@ -26,6 +35,11 @@ export function signToken(orderId: string, maxAgeMs: number = DEFAULT_MAX_AGE_MS
 /** Token khusus link tracking di notifikasi WA — berlaku 30 hari. */
 export function signTrackingToken(orderId: string): string {
   return signToken(orderId, TRACKING_LINK_TTL_MS);
+}
+
+/** Token untuk perangkat yang nomor HP-nya sudah diverifikasi — berlaku 30 hari. */
+export function signTrustedDeviceToken(orderId: string): string {
+  return signToken(orderId, TRUSTED_DEVICE_TTL_MS);
 }
 
 export function verifyToken(token: string): TrackSession | null {
@@ -59,10 +73,40 @@ export function buildSetCookie(orderId: string): string {
   ].join("; ");
 }
 
-export function getSessionFromCookie(cookieHeader: string | null): TrackSession | null {
+/**
+ * Token sesi mentah dari cookie (belum diverifikasi).
+ *
+ * Dipisah dari getSessionFromCookie karena halaman /status perlu token aslinya
+ * untuk dibaca di server (lihat lib/status-server.ts) — hasil verifyToken()
+ * sudah berupa payload dan tidak lagi memuat tanda tangannya.
+ */
+export function getTokenFromCookie(cookieHeader: string | null): string | null {
   if (!cookieHeader) return null;
   const match = cookieHeader.split(";").find((c) => c.trim().startsWith(`${COOKIE_NAME}=`));
   if (!match) return null;
-  const token = match.trim().split("=").slice(1).join("=");
-  return verifyToken(token);
+  return match.trim().split("=").slice(1).join("=");
+}
+
+/**
+ * Cookie untuk perangkat yang nomor HP-nya sudah diverifikasi (berlaku 30 hari,
+ * sama dengan tokennya).
+ *
+ * Token trusted-device tadinya hidup hanya di localStorage, dan localStorage
+ * tidak ikut terkirim ke server — akibatnya /status selalu dirender di browser
+ * (halaman kosong dulu beberapa detik) walau perangkatnya sudah dikenal.
+ * Dengan cookie ini HTML pertama sudah berisi data pesanan.
+ */
+export function buildTrustedDeviceCookie(rawToken: string): string {
+  return [
+    `${COOKIE_NAME}=${rawToken}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${Math.floor(TRUSTED_DEVICE_TTL_MS / 1000)}`,
+  ].join("; ");
+}
+
+export function getSessionFromCookie(cookieHeader: string | null): TrackSession | null {
+  const token = getTokenFromCookie(cookieHeader);
+  return token ? verifyToken(token) : null;
 }
