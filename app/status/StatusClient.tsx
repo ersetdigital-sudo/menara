@@ -404,6 +404,22 @@ export default function StatusClient() {
   const isShipped =
     (normalizedStatus === "kirim" || normalizedStatus === "selesai") && hasTracking;
   const pct = getProgress(step, hasTracking);
+  // Daftar tahap yang dipakai halaman ini: nama asli dari tabel
+  // `production_steps` kalau sudah dimuat, kalau belum pakai urutan kanonik.
+  const stepDefs: { name: string }[] =
+    steps.length > 0
+      ? steps
+      : ORDER_STATUS_LIST.map((s) => ({
+          name: ORDER_STATUS_LABELS[s as OrderStatus] || s,
+        }));
+  const stepNameOf = (n: number) =>
+    stepDefs[Math.min(Math.max(n, 1), stepDefs.length) - 1]?.name || "";
+  // Dua label kecil di bawah bar progres TIDAK ditulis mati ("Desain" /
+  // "Kirim"): kiri = tahap pesanan ini SEKARANG, jadi pesanan yang sudah di
+  // Finishing menampilkan "Finishing" — bukan "Desain" yang bikin customer
+  // mengira produksinya masih di tahap awal. Kanan = tahap terakhir alur.
+  const progressFromLabel = isOrderDone ? stepNameOf(totalSteps) : stepNameOf(step);
+  const progressToLabel = isOrderDone ? "Selesai" : stepNameOf(totalSteps);
   const lastUpdate = history.length > 0 ? history[history.length - 1] : null;
   // Keterangan "3 hari lagi" / "lewat 2 hari" untuk chip "Target selesai".
   const deadlineNote = formatDeadlineNoteID(order.deadline);
@@ -530,9 +546,9 @@ export default function StatusClient() {
                     <span key={i} className={i + 1 < step ? "on" : i + 1 === step ? "cur" : ""}></span>
                   ))}
                 </div>
-                <div className="dpo-mono mt-2.5 flex justify-between text-[10px] uppercase tracking-wider text-[#6f757c]">
-                  <span>Desain</span>
-                  <span>Kirim</span>
+                <div className="dpo-mono mt-2.5 flex justify-between gap-3 text-[10px] uppercase tracking-wider text-[#6f757c]">
+                  <span className="truncate">{progressFromLabel}</span>
+                  <span className="truncate text-right">{progressToLabel}</span>
                 </div>
               </div>
             </section>
@@ -589,7 +605,12 @@ export default function StatusClient() {
                           )}
                           {st === "todo" && n === step + 1 && <span className="dpo-chip dpo-chip-next">Berikutnya</span>}
                         </div>
-                        <p className="dpo-step-desc">{stepDescription(statusKey, hasTracking)}</p>
+                        {/* Tahap yang sudah lewat tidak lagi memakai kalimat
+                            proses ("Desain sedang dikerjakan") yang bertabrakan
+                            dengan chip "Selesai" — chip + tanggalnya sudah cukup. */}
+                        {st !== "done" && (
+                          <p className="dpo-step-desc">{stepDescription(statusKey, hasTracking)}</p>
+                        )}
                         {histEntry ? (
                           <p className="dpo-mono dpo-step-time">{formatShortDateTimeID(histEntry.created_at)}</p>
                         ) : st === "todo" && order.deadline ? (

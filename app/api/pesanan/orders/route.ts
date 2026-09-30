@@ -1,7 +1,14 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
 import { generateOrderNumber } from "@/lib/order-number";
 import { loadDashboardOrders, mapOrder } from "@/lib/pesanan-orders-server";
+import { triggerStageNotification } from "@/lib/fonnte";
+
+// Notifikasi WA tahap 1 dikirim SETELAH respons (lihat `after` di POST), dan
+// Fonnte bisa butuh sampai 10 detik. Tanpa durasi eksplisit, function bisa
+// dimatikan di tengah jalan saat provider lambat — notifikasinya hilang
+// padahal pesanannya sudah tersimpan.
+export const maxDuration = 30;
 
 export async function GET() {
   const supabase = await getAdminDb();
@@ -89,5 +96,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ order: mapOrder(data) }, { status: 201 });
+  // Customer dapat kabar WA begitu pesanan disimpan, bukan cuma saat tahapnya
+  // BERGESER. Sebelumnya pesanan baru yang masih di tahap 1 (Desain) tidak
+  // pernah mengirim notifikasi apa pun, jadi pembeli baru tahu kabar setelah
+  // operator memindahkan tahap.
+  //
+  // Anti-duplikat tetap dijaga `claim_stage_notification` (UNIQUE order_id+tahap),
+  // jadi klik Simpan dua kali tidak mengirim WA dua kali.
+  //
+  // Dijalankan lewat `after()` — bukan di-await di sini. Mengirim WA butuh
+  // round-trip ke Fonnte (timeout 10 detik), dan operator tidak perlu menunggu
+  // itu untuk melihat pesanannya masuk: tombol Simpan harus terasa instan.
+  // `after()` menahan function tetap hidup sampai tugasnya selesai, jadi
+  // notifikasi tidak ikut mati saat respons sudah dikirim.
+  after(async () => {
+    try {
+      await triggerStageNotification(
+        supabase,
+        data.id,
+        {
+          customer_name: data.customer_name,
+          order_number: data.order_number,
+          customer_phone: data.customer_phone,
+        },
+        1
+      );
+    } catch (e) {
+      // Notifikasi gagal tidak boleh membatalkan pesanan yang sudah tersimpan.
+      console.error("[orders] notifikasi tahap 1 gagal:", e);
+    }
+  });
+
+  return NextResponse.json(
+    {
+      order: mapOrder(data),
+      notification: { stage: 1, status: "queued" },
+    },
+    { status: 201 }
+  );
 }

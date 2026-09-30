@@ -4606,7 +4606,9 @@ function AddForm({
       // Pesanan yang baru dibuat ikut dibaca dari respons supaya bisa langsung
       // ditampilkan di daftar (lihat handler onSaved di atas).
       const created = await res.json().catch(() => null);
-      onSaved("Pesanan ditambahkan", created?.order);
+      // " · WA sedang dikirim" muncul karena notifikasi tahap 1 dikirim di
+      // belakang layar (after()) — lihat app/api/pesanan/orders/route.ts.
+      onSaved(`Pesanan ditambahkan${waNote(created?.notification?.status)}`, created?.order);
     } catch {
       setError("Gagal menyimpan");
     } finally {
