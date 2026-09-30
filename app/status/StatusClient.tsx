@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { waMeUrl } from "@/lib/wa";
 
 import {
   ORDER_STATUS_LABELS,
@@ -18,7 +17,11 @@ import {
   stepFromStatus,
   TOTAL_STAGES,
 } from "@/lib/order-status";
-import { formatShortDateTimeID } from "@/lib/format-date";
+import {
+  formatShortDateID,
+  formatShortDateTimeID,
+  formatDeadlineNoteID,
+} from "@/lib/format-date";
 
 const CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 const SPIN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3.2-6.9"/></svg>';
@@ -90,16 +93,11 @@ function stepHighlight(status: string, hasTracking: boolean): string {
 /**
  * Halaman status pesanan (client component).
  *
- * Identitas toko datang sebagai PROP dari server (`app/status/page.tsx` →
- * getBrand()), bukan dari state + fetch ke /api/brand. Jadi HTML pertama yang
- * dikirim ke customer sudah memuat nomor WhatsApp dari menu Pengaturan — tidak
- * ada lagi nomor cadangan yang tertulis di bundle.
+ * Sengaja TIDAK ada tombol "Hubungi CS"/WhatsApp di halaman ini: fungsinya
+ * murni melihat progres pesanan, dan kanal komunikasi sudah lewat pesan
+ * WhatsApp yang dikirim otomatis tiap tahap.
  */
-export default function StatusClient({
-  brand,
-}: {
-  brand: { name: string; whatsapp_number: string };
-}) {
+export default function StatusClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = (searchParams.get("order") || "").toUpperCase();
@@ -407,10 +405,8 @@ export default function StatusClient({
     (normalizedStatus === "kirim" || normalizedStatus === "selesai") && hasTracking;
   const pct = getProgress(step, hasTracking);
   const lastUpdate = history.length > 0 ? history[history.length - 1] : null;
-  const waLink = waMeUrl(
-    brand.whatsapp_number,
-    `Halo ${brand.name}, saya mau tanya order ${orderId}`
-  );
+  // Keterangan "3 hari lagi" / "lewat 2 hari" untuk chip "Target selesai".
+  const deadlineNote = formatDeadlineNoteID(order.deadline);
 
   // Product data (new structured format) with fallback to legacy fields
   const products: { name: string; sizes: { size: string; qty: number }[] }[] =
@@ -450,18 +446,10 @@ export default function StatusClient({
                   <p className="text-[10.5px] text-[#6f757c] sm:text-[11px]">Pabrik Jersey Custom Full Printing</p>
                 </div>
               </div>
-              <a
-                href={waLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/[.12] bg-white/5 px-4 py-2 text-[13px] font-medium text-[#979ba4] hover:bg-white/10 hover:text-white transition"
-              >
-                Hubungi CS
-              </a>
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-3xl px-4 pb-28 sm:px-6 sm:pb-20">
+          <main className="mx-auto w-full max-w-3xl px-4 pb-16 sm:px-6 sm:pb-20">
 
             {/* HERO / STATUS */}
             <section className="dpo-reveal pt-7 sm:pt-12">
@@ -503,8 +491,17 @@ export default function StatusClient({
                   <span className="dpo-live"></span> {stepHighlight(order.current_status, hasTracking)}
                 </span>
                 {order.deadline && (
-                  <span className="dpo-meta">
-                    Target <span className="dpo-mono ml-1 text-[#e8ebe9]">{formatShortDateTimeID(order.deadline)}</span>
+                  <span
+                    className="dpo-meta"
+                    title="Perkiraan tanggal pesanan selesai diproduksi (WIB)"
+                  >
+                    Target selesai
+                    <span className="dpo-mono text-[#e8ebe9]">
+                      {formatShortDateID(order.deadline)}
+                    </span>
+                    {deadlineNote && (
+                      <span className="text-[#6f757c]">· {deadlineNote}</span>
+                    )}
                   </span>
                 )}
               </div>
@@ -729,6 +726,25 @@ export default function StatusClient({
                   </div>
                 )}
 
+                {/* "Target" di header chip sering bikin bingung, jadi tanggalnya
+                    diulang di sini lengkap dengan penjelasannya. */}
+                {order.deadline && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[.03] px-4 py-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                      <p className="dpo-kicker">Target Selesai</p>
+                      <p className="dpo-mono text-[14px] text-[#e8ebe9]">
+                        {formatShortDateID(order.deadline)}
+                        {deadlineNote && (
+                          <span className="ml-2 text-[#6f757c]">· {deadlineNote}</span>
+                        )}
+                      </p>
+                    </div>
+                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#6f757c]">
+                      Perkiraan tanggal pesanan kamu selesai diproduksi (WIB), bukan jadwal kirim ekspedisi.
+                    </p>
+                  </div>
+                )}
+
                 {order.design_notes && (
                   <details className="mt-5 group">
                     <summary className="cursor-pointer list-none flex items-center justify-between rounded-xl border border-white/10 bg-white/[.03] px-4 py-3 text-[14px] hover:bg-white/[.06] transition">
@@ -789,42 +805,10 @@ export default function StatusClient({
               </section>
             )}
 
-            {/* CTA */}
-            <section className="dpo-card mt-8 p-6 sm:p-8 text-center">
-              <h2 className="dpo-h1 text-2xl sm:text-3xl">Ada yang mau ditanyakan?</h2>
-              <p className="mt-2 text-[14px] text-[#979ba4]">Tim CS kami siap bantu, Senin–Sabtu 08.00–20.00 WIB.</p>
-              <div className="mt-5 flex justify-center">
-                <a
-                  href={waLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[#FFE500] px-8 py-3.5 text-[15px] font-semibold text-black hover:bg-[#FFE500] transition hover:-translate-y-px"
-                >
-                  Chat CS via WhatsApp
-                </a>
-              </div>
-              <p className="mt-4 text-[12px] text-[#6f757c]">Semua komunikasi order ditangani lewat WhatsApp resmi MENARA.</p>
-            </section>
-
             <footer className="mt-10 text-center text-[12px] text-[#6f757c]">
               <p>© 2026 MENARA — Pabrik Jersey Custom Full Printing</p>
             </footer>
           </main>
-
-          {/* STICKY CTA MOBILE */}
-          <div className="dpo-stickycta">
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#FFE500] px-6 py-3.5 text-[15px] font-semibold text-black"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 18, height: 18, flex: "none" }} aria-hidden="true">
-                <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 1 1-4.1 14.9l-.4-.2-2.7.7.7-2.6-.2-.4A8 8 0 0 1 12 4z"></path>
-              </svg>
-              Chat CS via WhatsApp
-            </a>
-          </div>
 
           {lightboxUrl && (
             <div

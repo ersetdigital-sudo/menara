@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import UploadIndicator from "@/components/admin/UploadIndicator";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_LIST, getProgress } from "@/lib/types";
 import {
   dateKeyID,
@@ -365,10 +366,22 @@ function NavIcon({ name, size = 18 }: { name: string; size?: number }) {
   );
 }
 
-export default function PesananDashboard() {
+/**
+ * @param initialOrders Data yang sudah dibaca server (lihat
+ *   app/pesanan/orders/page.tsx). Kalau terisi, kartu KPI dan tabel sudah
+ *   berisi angka di HTML pertama — tidak ada lagi momen "kartu masih 0".
+ */
+export default function PesananDashboard({
+  initialOrders,
+}: {
+  initialOrders?: OrderData[];
+} = {}) {
   const router = useRouter();
-  const [orders, setOrders] = useState<OrderData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<OrderData[]>(initialOrders ?? []);
+  const [loading, setLoading] = useState(!initialOrders);
+  // Data awal dari server → tidak perlu fetch ulang saat halaman baru dibuka.
+  // Daftar tetap diperbarui setelah aksi apa pun (simpan, hapus, pindah tahap).
+  const hasServerData = (initialOrders?.length ?? 0) > 0;
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -419,9 +432,9 @@ export default function PesananDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    if (!hasServerData) fetchOrders();
     fetchSteps();
-  }, [fetchOrders, fetchSteps]);
+  }, [fetchOrders, fetchSteps, hasServerData]);
 
   useEffect(() => {
     const h = window.location.hash.replace("#", "") as ViewKey;
@@ -735,10 +748,17 @@ export default function PesananDashboard() {
               </button>
             </div>
             <AddForm
-              onSaved={(msg) => {
-                fetchOrders();
+              onSaved={(msg, created) => {
+                // Baris baru langsung dipasang dari respons server, jadi panel
+                // bisa ditutup dan pesanannya sudah kelihatan saat itu juga.
+                // Penyegaran daftar di bawah cuma untuk melengkapi data yang
+                // tidak ada di respons.
+                if (created) {
+                  setOrders((prev) => [created, ...prev.filter((o) => o.id !== created.id)]);
+                }
                 closeAll();
                 showToast(msg);
+                fetchOrders();
               }}
               onCancel={closeAll}
             />
@@ -763,6 +783,9 @@ export default function PesananDashboard() {
 
       {/* â”€â”€ TOAST â”€â”€ */}
       <div className={`pas-toast ${toast ? "on" : ""}`}>{toast}</div>
+
+      {/* ── INDIKATOR UPLOAD FOTO (design, WO) ── */}
+      <UploadIndicator />
     </div>
   );
 }
@@ -4338,7 +4361,11 @@ function AddForm({
   onSaved,
   onCancel,
 }: {
-  onSaved: (msg: string) => void;
+  /**
+   * `order` = pesanan yang baru dibuat, dikirim balik server. Dipakai induk
+   * untuk menampilkan barisnya SEKETIKA tanpa menunggu daftar dimuat ulang.
+   */
+  onSaved: (msg: string, order?: OrderData) => void;
   onCancel: () => void;
 }) {
   const DRAFT_KEY = "pas_add_order_draft";
@@ -4484,7 +4511,10 @@ function AddForm({
       if (usedProducts.length > 0) setProductOptions(rememberProducts(usedProducts));
       shouldSkipDraftSaveRef.current = true;
       localStorage.removeItem(DRAFT_KEY);
-      onSaved("Pesanan ditambahkan");
+      // Pesanan yang baru dibuat ikut dibaca dari respons supaya bisa langsung
+      // ditampilkan di daftar (lihat handler onSaved di atas).
+      const created = await res.json().catch(() => null);
+      onSaved("Pesanan ditambahkan", created?.order);
     } catch {
       setError("Gagal menyimpan");
     } finally {

@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getBrand } from "@/lib/queries";
 import StatusClient from "./StatusClient";
 
 export const metadata: Metadata = {
@@ -8,18 +7,15 @@ export const metadata: Metadata = {
   description: "Pantau progres produksi pesanan jersey custom MENARA.",
 };
 
-// Identitas toko dibaca per request: nomor WhatsApp untuk tombol CS harus sama
-// dengan yang diisi di menu Pengaturan admin, termasuk di HTML pertama.
+// Identitas toko tidak lagi dibaca di sini — halaman status sekarang murni
+// tracking tanpa tombol WhatsApp, jadi tidak ada lagi nomor yang perlu
+// dipasok ke halaman ini.
 export const dynamic = "force-dynamic";
 
 export default async function StatusPage() {
-  const brand = await getBrand();
-
   return (
     <Suspense fallback={null}>
-      <StatusClient
-        brand={{ name: brand.name, whatsapp_number: brand.whatsappNumber }}
-      />
+      <StatusClient />
     </Suspense>
   );
 }

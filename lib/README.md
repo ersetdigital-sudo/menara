@@ -11,7 +11,7 @@ halaman (server component), komponen dashboard, dan API routes.
 | `order-status.ts` | **Satu sumber kebenaran** aturan "status → tahap → progress" jersey: `stepFromStatus`, `statusFromStep`, `progressPercentFromStatus`, `isOrderCompleted`, `nextStageLabel`, `STATUS_TO_STAGE`, `stageLabel`, normalisasi slug lama (`print` → `cetak_print`), `STAGE_BACKFILL_NOTES` |
 | `maklon-status.ts` | Hal yang sama untuk **6 tahap maklon**: `MAKLON_STAGES` (step + slug + label), `maklonStatusFromStep`, `maklonStepFromStatus`, `maklonProgress`, `isMaklonCompleted` |
 | `order-number.ts` | Generator nomor pesanan bersama jersey & maklon: `generateOrderNumber`, `jakartaDatePart`, `ORDER_NUMBER_REGEX`. Memakai CSPRNG, bukan `Math.random()` |
-| `format-date.ts` | **Satu-satunya** tempat format tanggal & jam, semuanya dipaksa zona `Asia/Jakarta`: `formatDateTimeID`, `formatShortDateTimeID`, `formatDateTimeWIB`, `formatNumericDateID`, `formatShortDateID`, `formatTimeID`, `dateKeyID` (kunci harian) dan `monthKeyID` (kunci bulanan untuk laporan) |
+| `format-date.ts` | **Satu-satunya** tempat format tanggal & jam, semuanya dipaksa zona `Asia/Jakarta`: `formatDateTimeID`, `formatShortDateTimeID`, `formatDateTimeWIB`, `formatNumericDateID`, `formatShortDateID`, `formatTimeID`, `dateKeyID` (kunci harian), `monthKeyID` (kunci bulanan untuk laporan), plus `daysUntilID`/`formatDeadlineNoteID` (jarak hari ke tanggal *deadline*, dihitung per tanggal WIB) |
 | `queries-orders.ts` | Akses data order: `getOrderByTracking` (memverifikasi nomor HP sebelum mengembalikan data), `getAllOrders`, `getOrderById`, `stripWoPhoto` |
 | `product-options.ts` | Daftar pilihan produk form Pesanan & Maklon: `DEFAULT_PRODUCTS`, `mergeProductOptions(extra)`, `rememberProducts(names)`, plus `productFamily(name)` (Atasan / Setelan / null) yang dipakai laporan *Penjualan per Produk* dan bagian produk di beranda. Produk custom disimpan di `localStorage` (per perangkat), jadi form **wajib** memberi `extra` = nama produk order yang sedang dibuka |
 
@@ -49,7 +49,10 @@ Anti-duplikat notifikasi tidak dicek di kode, tapi di database: RPC
 | `supabase/client.ts` | Supabase client untuk browser (anon key) |
 | `supabase/server.ts` | `createClient()` (cookie session, anon) dan `createServiceClient()` (service role, menembus RLS — hanya untuk server) |
 | `admin-auth.ts` | `getAdminDb()` — guard route handler dashboard: cek cookie `pesanan_auth` / user Supabase, lalu kembalikan service-role client (atau `null` → balas 401) |
-| `cloudinary.ts` | Helper Cloudinary: `uploadToCloudinary` (unsigned upload) dan `cloudinaryUrl` (transformasi `f_auto,q_auto`) |
+| `cloudinary.ts` | Helper Cloudinary sisi browser: `uploadToCloudinary(file, { folder })` (perkecil foto → kirim lewat XHR supaya progresnya terbaca), `validateImageFile` + `MAX_IMAGE_BYTES` (10 MB, berkas asli), `MAX_UPLOAD_DIMENSION`/`JPEG_QUALITY` (aturan pengecilan) |
+| `upload-progress.ts` | Papan pengumuman upload foto: `beginUpload` → `markUploadReady` → `setUploadPercent` → `finishUpload`/`failUpload`, plus `formatBytes`. Dibaca komponen `components/admin/UploadIndicator.tsx` lewat `useSyncExternalStore`, jadi satu indikator melayani semua tombol upload |
+| `pesanan-orders-server.ts` | Baca pesanan jersey untuk dashboard: `mapOrder` (bentuk data yang dilihat dashboard), `loadDashboardOrders`, `DashboardOrder`. Dipakai `GET /api/pesanan/orders` **dan** render server `app/pesanan/orders/page.tsx` |
+| `maklon-orders-server.ts` | Pasangannya untuk maklon: `mapMaklonOrder`, `loadMaklonOrders`, `MaklonDashboardOrder`. Dipakai `GET /api/pesanan/maklon` dan `app/pesanan/maklon/page.tsx` |
 
 ## Lain-lain
 

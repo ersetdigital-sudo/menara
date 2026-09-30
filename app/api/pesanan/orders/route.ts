@@ -1,37 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/admin-auth";
 import { generateOrderNumber } from "@/lib/order-number";
-import { isOrderCompleted, progressPercentFromStatus, stepFromStatus } from "@/lib/order-status";
-
-function mapOrder(row: any) {
-  const hasTracking = !!(row.tracking_number && row.courier);
-  const step = stepFromStatus(row.current_status);
-  const pct = progressPercentFromStatus(row.current_status, hasTracking);
-  return {
-    id: row.order_number,
-    customer_name: row.customer_name,
-    customer_phone: row.customer_phone,
-    customer_city: row.customer_city || "",
-    product_name: row.product_type || "",
-    quantity: row.quantity ? `${row.quantity} pcs` : "-",
-    material: row.material || "",
-    sizes: row.sizes || "",
-    design_photos: Array.isArray(row.design_photos) ? row.design_photos.map((p: any) =>
-      typeof p === "string" ? p : p.url || ""
-    ).filter(Boolean) : [],
-    wo_photos: Array.isArray(row.wo_photos) ? row.wo_photos.map((p: any) => typeof p === "string" ? p : p.url || "").filter(Boolean) : [],
-    products: Array.isArray(row.products) ? row.products : [],
-    current_step: step,
-    note: row.design_notes || "",
-    note_time: row.updated_at || "",
-    courier: row.courier || "",
-    tracking_number: row.tracking_number || "",
-    is_done: isOrderCompleted(row.current_status) || (step === 11 && hasTracking),
-    deadline: row.deadline || null,
-    created_at: row.created_at,
-    pct,
-  };
-}
+import { loadDashboardOrders, mapOrder } from "@/lib/pesanan-orders-server";
 
 export async function GET() {
   const supabase = await getAdminDb();
@@ -39,16 +9,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    return NextResponse.json({ orders: await loadDashboardOrders(supabase) });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Gagal memuat pesanan" }, { status: 500 });
   }
-
-  return NextResponse.json({ orders: (data || []).map(mapOrder) });
 }
 
 export async function POST(request: Request) {
