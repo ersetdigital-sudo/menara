@@ -2419,6 +2419,12 @@ table.pas-tbl tbody tr:hover { background: rgba(12,12,13,.03); }
 }
 @media (max-width: 640px) { .pas-toast { right: 12px; left: 12px; top: 12px; transform: translateY(-8px); text-align: center; } .pas-toast.on { transform: translateY(0); } }
 
+/* mockup .top: kicker huruf kapital kecil di atas judul halaman */
+.pas-kicker {
+  color: var(--pas-accent); font-size: 11px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase; line-height: 1;
+}
+.pas-title { font-size: 20px; font-weight: 700; line-height: 1.15; }
 .pas-display {
   /* MENARA: pakai Inter (satu keluarga font) */
   font-family: var(--font-sans), "Inter", system-ui, sans-serif;

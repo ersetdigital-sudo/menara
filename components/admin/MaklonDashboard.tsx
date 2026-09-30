@@ -23,6 +23,18 @@ function optimizeDesignUrl(url: string): string {
   return url.includes("/upload/") ? url.replace("/upload/", "/upload/f_auto,q_auto/") : url;
 }
 
+/**
+ * Jumlah pcs untuk ditampilkan.
+ *
+ * `quantity` dari API sudah berbentuk "12 pcs" (lihat mapMaklonOrder), jadi
+ * menulis angka itu lalu menempel " pcs" menghasilkan "12 pcs pcs". Satuan
+ * hanya boleh ditempel lewat fungsi ini.
+ */
+function pcsLabel(q: unknown): string {
+  const n = parseInt(String(q ?? ""), 10);
+  return Number.isNaN(n) ? "-" : `${n} pcs`;
+}
+
 type StepRow = { id: string; name: string; position: number };
 
 /**
@@ -156,8 +168,6 @@ export default function MaklonDashboard({
 } = {}) {
   const [orders, setOrders] = useState<OrderData[]>(initialOrders ?? []);
   const [loading, setLoading] = useState(!initialOrders);
-  // Data awal dari server → tidak perlu fetch ulang saat halaman baru dibuka.
-  const hasServerData = (initialOrders?.length ?? 0) > 0;
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -194,10 +204,13 @@ export default function MaklonDashboard({
     }
   }, []);
 
+  // Data yang dilukis server cuma untuk tampilan pertama; daftar tetap
+  // disegarkan di latar belakang supaya halaman yang di-refresh operator
+  // menampilkan kondisi terkini, bukan snapshot saat HTML dibuat.
   useEffect(() => {
-    if (!hasServerData) fetchOrders();
+    fetchOrders();
     fetchSteps();
-  }, [fetchOrders, fetchSteps, hasServerData]);
+  }, [fetchOrders, fetchSteps]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -285,20 +298,35 @@ export default function MaklonDashboard({
 
       <div className="flex-1 min-w-0">
         <header className="pas-topbar">
-          <div className="px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <img src="/logo-menara.png" alt="MENARA" className="pas-mark w-12 h-12 rounded-[9px] object-contain lg:hidden" />
+          <div className="px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Logo brand tidak lagi di topbar — di ponsel halaman ini dibuka
+                  dari menu Pesanan, jadi yang dibutuhkan jalan kembali. */}
+              <a
+                href="/pesanan/orders"
+                className="lg:hidden -ml-1.5 shrink-0 p-2.5 rounded-lg border border-[var(--pas-line)] text-[var(--pas-muted)] hover:text-[var(--pas-ink-1)] hover:bg-[var(--pas-surface-2)] transition"
+                aria-label="Kembali ke Pesanan"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 6l-6 6 6 6" />
+                </svg>
+              </a>
               <div className="min-w-0">
-                <p className="text-[11px] text-[var(--pas-muted)] leading-none">Operasional</p>
-                <h1 className="pas-display text-[17px] leading-tight mt-1 truncate">Maklon</h1>
+                <p className="pas-kicker truncate">Operasional</p>
+                <h1 className="pas-display pas-title mt-1 truncate">Maklon</h1>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="hidden lg:inline text-[12.5px] text-[var(--pas-muted)]">
                 {formatShortDateID(new Date())}
               </span>
-              <button onClick={() => setShowAdd(true)} className="pas-btn-accent px-3.5 py-2.5 text-[14px] sm:px-4">
-                <span className="sm:inline">+ </span>Maklon
+              <button
+                onClick={() => setShowAdd(true)}
+                className="pas-btn-accent inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[12.5px] sm:px-4 sm:text-[14px]"
+                aria-label="Tambah maklon baru"
+              >
+                <span aria-hidden="true" className="text-[15px] leading-none">+</span>
+                Maklon
               </button>
             </div>
           </div>
@@ -445,9 +473,12 @@ export default function MaklonDashboard({
                   const stageName = steps[o.current_step - 1]?.name || `Tahap ${o.current_step}`;
                   return (
                     <div key={o.id} className="pas-bento-card cursor-pointer" onClick={() => setOpenId(o.id)}>
-                      <div className="flex items-center justify-between pr-2">
-                        <p className="font-bold text-[16px] pas-num">{o.id}</p>
-                        <span className={`pas-pill ${st}`}>{FILTER_LABEL[st]}</span>
+                      {/* Bungkusnya boleh turun baris: nomor pesanan warisan
+                          ("MENARA…") lebih panjang dari prefix baru dan di
+                          ponsel badge statusnya dulu terhimpit. */}
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pr-2">
+                        <p className="font-bold text-[16px] pas-num break-all">{o.id}</p>
+                        <span className={`pas-pill ${st} shrink-0`}>{FILTER_LABEL[st]}</span>
                       </div>
                       <div className="flex items-center justify-between mt-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -457,7 +488,7 @@ export default function MaklonDashboard({
                             <p className="text-[12px] text-[var(--pas-muted)] truncate">{o.customer_city}</p>
                           </div>
                         </div>
-                        <p className="text-[14px] font-semibold pas-num shrink-0 ml-3">{o.quantity} pcs</p>
+                        <p className="text-[14px] font-semibold pas-num shrink-0 ml-3">{pcsLabel(o.quantity)}</p>
                       </div>
                       <p className="text-[13px] text-[var(--pas-muted)] mt-3">{o.product_name}</p>
                       <div className="mt-3">
@@ -1314,7 +1345,7 @@ function DetailSheet({
               )}
               <div className="px-4 py-3 border-b border-r border-[var(--pas-line)]">
                 <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Jumlah</span>
-                <p className="mt-1 text-[14px] font-semibold">{order.quantity} pcs</p>
+                <p className="mt-1 text-[14px] font-semibold">{pcsLabel(order.quantity)}</p>
               </div>
               <div className="px-4 py-3 border-b border-[var(--pas-line)]">
                 <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Ekspedisi / Resi</span>

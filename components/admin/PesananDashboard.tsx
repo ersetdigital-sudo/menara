@@ -126,6 +126,18 @@ function orderPcs(o: OrderData): number {
 }
 
 /**
+ * Jumlah pcs untuk ditampilkan.
+ *
+ * `quantity` dari API sudah berbentuk "12 pcs" (lihat mapOrder), jadi menulis
+ * angka itu lalu menempel " pcs" menghasilkan "12 pcs pcs". Satuan hanya boleh
+ * ditempel lewat fungsi ini.
+ */
+function pcsLabel(q: unknown): string {
+  const n = parseInt(String(q ?? ""), 10);
+  return Number.isNaN(n) ? "-" : `${n} pcs`;
+}
+
+/**
  * Pecah satu order jadi bucket per PRODUK (label = nama produk apa adanya).
  *
  * Sumber utama adalah `products[]` karena satu order bisa berisi campuran
@@ -382,7 +394,6 @@ export default function PesananDashboard({
   const [loading, setLoading] = useState(!initialOrders);
   // Data awal dari server → tidak perlu fetch ulang saat halaman baru dibuka.
   // Daftar tetap diperbarui setelah aksi apa pun (simpan, hapus, pindah tahap).
-  const hasServerData = (initialOrders?.length ?? 0) > 0;
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -432,10 +443,13 @@ export default function PesananDashboard({
     }
   }, []);
 
+  // Data yang dilukis server cuma untuk tampilan pertama; daftar tetap
+  // disegarkan di latar belakang supaya halaman yang di-refresh operator
+  // menampilkan kondisi terkini, bukan snapshot saat HTML dibuat.
   useEffect(() => {
-    if (!hasServerData) fetchOrders();
+    fetchOrders();
     fetchSteps();
-  }, [fetchOrders, fetchSteps, hasServerData]);
+  }, [fetchOrders, fetchSteps]);
 
   useEffect(() => {
     const h = window.location.hash.replace("#", "") as ViewKey;
@@ -549,21 +563,12 @@ export default function PesananDashboard({
       {/* â”€â”€ MAIN â”€â”€ */}
       <div className="flex-1 min-w-0">
         <header className="pas-topbar">
-          <div className="px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-<img src="/logo-menara.png" alt="MENARA" className="pas-mark w-12 h-12 rounded-[9px] object-contain lg:hidden" />
-              <div className="min-w-0">
-                <p className="text-[11px] text-[var(--pas-muted)] leading-none">
-                  {meta.crumb}
-                </p>
-                <h1 className="pas-display text-[17px] leading-tight mt-1 truncate">
-                  {meta.title}
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Logo tidak lagi dipakai di topbar (terlalu sempit di ponsel) —
+                  logo brand hidup di menu/drawer saja. */}
               <button
-                className="lg:hidden p-2.5 rounded-lg border border-[var(--pas-line)] text-[var(--pas-muted)] hover:text-[var(--pas-ink-1)] hover:bg-[var(--pas-surface-2)] transition"
+                className="lg:hidden -ml-1.5 shrink-0 p-2.5 rounded-lg border border-[var(--pas-line)] text-[var(--pas-muted)] hover:text-[var(--pas-ink-1)] hover:bg-[var(--pas-surface-2)] transition"
                 onClick={() => setShowMobileNav(true)}
                 aria-label="Buka menu"
               >
@@ -571,20 +576,31 @@ export default function PesananDashboard({
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
+              <div className="min-w-0">
+                <p className="pas-kicker truncate">{meta.crumb}</p>
+                <h1 className="pas-display pas-title mt-1 truncate">
+                  {meta.title}
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               <span className="hidden lg:inline text-[12.5px] text-[var(--pas-muted)]">
                 {formatShortDateID(new Date())}
               </span>
               {currentView === "pesanan" && (
                 <button
                   onClick={() => setShowAdd(true)}
-                  className="pas-btn-accent px-3.5 py-2.5 text-[14px] sm:px-4"
+                  className="pas-btn-accent inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[12.5px] sm:px-4 sm:text-[14px]"
+                  aria-label="Tambah pesanan baru"
                 >
-                  <span className="sm:inline">+ </span>Pesanan
+                  <span aria-hidden="true" className="text-[15px] leading-none">+</span>
+                  Pesanan
                 </button>
               )}
+              {/* "Keluar" pindah ke menu di ponsel supaya topbar tidak berjejal */}
               <button
                 onClick={handleLogout}
-                className="pas-btn-ghost px-3 py-2 text-[13px] text-[var(--pas-muted)]"
+                className="pas-btn-ghost hidden lg:inline-block px-3 py-2 text-[13px] text-[var(--pas-muted)]"
               >
                 Keluar
               </button>
@@ -621,13 +637,15 @@ export default function PesananDashboard({
       {/* â”€â”€ MOBILE NAV DRAWER â”€â”€ */}
       <Sheet open={showMobileNav} onOpenChange={setShowMobileNav}>
         <SheetContent side="left" className="p-5 bg-[#111113] text-white border-r border-white/10 w-[280px] [&>button]:text-white/50 [&>button]:hover:text-white [&>button]:hover:bg-white/10 [&>button]:rounded-lg [&>button]:p-2 [&>button]:transition">
-          {/* Drawer header */}
-          <div className="flex items-center mb-2">
-            <a href="/" className="flex items-center gap-2.5">
-              <span className="pas-mark w-8 h-8 rounded-[9px] grid place-items-center pas-display text-[13px] bg-white/10">
-                T
-              </span>
-              <span className="pas-display text-[15px] text-white">MENARA</span>
+          {/* Drawer header — satu-satunya tempat logo brand muncul di ponsel */}
+          <div className="flex items-center mb-2 pr-8">
+            <a href="/" className="flex items-center gap-2.5 min-w-0">
+              <img
+                src="/logo-menara.png"
+                alt="MENARA"
+                className="w-9 h-9 rounded-[9px] object-contain"
+              />
+              <span className="pas-display text-[15px] text-white truncate">MENARA</span>
             </a>
           </div>
           <p className="pas-navsec">Operasional</p>
@@ -675,6 +693,17 @@ export default function PesananDashboard({
               </a>
             ))}
           </nav>
+
+          {/* Keluar: di ponsel tombolnya pindah ke sini dari topbar */}
+          <button
+            onClick={() => {
+              setShowMobileNav(false);
+              handleLogout();
+            }}
+            className="pas-btn-ghost mt-6 w-full px-3 py-3 text-[13.5px] text-[var(--pas-muted)]"
+          >
+            Keluar
+          </button>
         </SheetContent>
       </Sheet>
 
@@ -1231,10 +1260,13 @@ function ViewPesanan({
                 </button>
               </div>
 
-              {/* Baris 1: Nomor pesanan + badge status */}
-              <div className="flex items-center justify-between pr-10">
-                <p className="font-bold text-[16px] pas-num">{o.id}</p>
-                <span className={`pas-pill ${st}`}>{FILTER_LABEL[st]}</span>
+              {/* Baris 1: Nomor pesanan + badge status.
+                  Bungkusnya boleh turun baris: nomor pesanan warisan ("MENARA…")
+                  lebih panjang dari prefix baru, dan di ponsel badge statusnya
+                  dulu terhimpit sampai ikut terpotong. */}
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pr-10">
+                <p className="font-bold text-[16px] pas-num break-all">{o.id}</p>
+                <span className={`pas-pill ${st} shrink-0`}>{FILTER_LABEL[st]}</span>
               </div>
 
               {/* Baris 2: Avatar + Nama customer + Jumlah pcs */}
@@ -1246,7 +1278,7 @@ function ViewPesanan({
                     <p className="text-[12px] text-[var(--pas-muted)] truncate">{o.customer_city}</p>
                   </div>
                 </div>
-                <p className="text-[14px] font-semibold pas-num shrink-0 ml-3">{o.quantity} pcs</p>
+                <p className="text-[14px] font-semibold pas-num shrink-0 ml-3">{pcsLabel(o.quantity)}</p>
               </div>
 
               {/* Baris 3: Nama produk */}
@@ -3972,7 +4004,7 @@ function DetailSheet({
               )}
               <div className="px-4 py-3 border-b border-r border-[var(--pas-line)]">
                 <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Jumlah</span>
-                <p className="mt-1 text-[14px] font-semibold">{order.quantity} pcs</p>
+                <p className="mt-1 text-[14px] font-semibold">{pcsLabel(order.quantity)}</p>
               </div>
               {step === 11 && (courier || resi) ? (
                 <div className="px-4 py-3 border-b border-[var(--pas-line)]">

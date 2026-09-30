@@ -54,7 +54,7 @@ export default function TrackForm({
 
       if (!res.ok) {
         showErr(
-          "Nomor pesanan tidak ditemukan. Cek lagi formatnya (contoh: MENARA260907K4XQ) atau hubungi admin."
+          "Nomor pesanan tidak ditemukan. Cek lagi formatnya (contoh: MNR260907K4XQ) atau hubungi admin."
         );
         setLoading(false);
         return;
@@ -149,7 +149,7 @@ export default function TrackForm({
                         setOrderNumber(e.target.value);
                         clearErr();
                       }}
-                      placeholder="MENARA260907K4XQ"
+                      placeholder="MNR260907K4XQ"
                       autoComplete="off"
                       className="trk-field w-full mt-2 px-4 py-3.5 text-[16px] tracking-wide"
                     />
