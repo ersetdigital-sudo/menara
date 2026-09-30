@@ -45,6 +45,17 @@ export function waMeUrl(phone: string, text?: string): string {
 }
 
 /**
+ * Digit saja (tanpa spasi/dash/plus) — dipakai untuk menampilkan & menyalin
+ * nomor pembeli di panel admin. Nomor ber-dash cuma bikin ribet saat ditempel
+ * ke WhatsApp atau form ekspedisi.
+ *
+ *   0851-9415-4165 → 085194154165
+ */
+export function compactPhone(raw: string | null | undefined): string {
+  return (raw || "").replace(/\D/g, "");
+}
+
+/**
  * Nomor untuk DITAMPILKAN ke customer: format lokal berkelompok.
  *
  * Diambil dari nilai yang sama dengan yang dipakai link WA, jadi teks di

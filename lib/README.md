@@ -25,7 +25,7 @@ cadangan di dashboard semuanya menurun dari dua file itu — tidak perlu dicari 
 | --- | --- |
 | `fonnte.ts` | Integrasi Fonnte: template pesan (`buildWhatsAppMessage`, `buildMaklonWhatsAppMessage`), URL tracking publik, `sendFonnteMessage` (timeout 10 detik), `triggerStageNotification` & `triggerMaklonStageNotification`, ambil token dari `app_settings` |
 | `fonnte-crypto.ts` | Enkripsi/dekripsi token Fonnte (AES-256-GCM, key dari `SETTINGS_ENCRYPTION_KEY`). Token tidak pernah dikirim ke browser |
-| `wa.ts` | Normalisasi & validasi nomor WhatsApp + `buildWhatsAppLink` (satu tempat untuk aturan format internasional) |
+| `wa.ts` | Normalisasi & validasi nomor WhatsApp + `buildWhatsAppLink` (satu tempat untuk aturan format internasional) + `compactPhone` (digit saja, untuk ditampilkan/disalin di panel admin) |
 | `verify-token.ts` | Token tracking bertanda tangan HMAC: `signToken`, `verifyToken`, `signTrackingToken` (berlaku 30 hari), `buildSetCookie` |
 | `rate-limit.ts` | Rate limiter in-memory sliding window (`checkRateLimit`) untuk endpoint update tahap. Per-instance server, bukan global |
 | `notif-note.ts` | `waNote(status)` — ubah status kirim WA jadi kalimat toast ("WA terkirim", "WA gagal dikirim", …). Client-safe; dipakai form Pesanan & Maklon |

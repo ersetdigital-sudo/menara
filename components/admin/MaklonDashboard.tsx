@@ -10,6 +10,7 @@ import {
   rememberProducts,
 } from "@/lib/product-options";
 import { waNote } from "@/lib/notif-note";
+import { compactPhone } from "@/lib/wa";
 import {
   formatDateTimeWIB,
   formatNumericDateID,
@@ -492,6 +493,7 @@ export default function MaklonDashboard({
             setOpenId(null);
             showToast(msg);
           }}
+          onToast={showToast}
         />
       )}
 
@@ -949,12 +951,14 @@ function DetailSheet({
   steps,
   onClose,
   onSaved,
+  onToast,
 }: {
   orderId: string;
   orders: OrderData[];
   steps: StepRow[];
   onClose: () => void;
   onSaved: (msg: string) => void;
+  onToast: (msg: string) => void;
 }) {
   const order = orders.find((o) => o.id === orderId);
   const [step, setStep] = useState(order?.current_step ?? 1);
@@ -968,6 +972,8 @@ function DetailSheet({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  // Penanda sebentar setelah nomor HP customer disalin (ikon berubah centang).
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   useEffect(() => {
     if (order) {
@@ -1012,6 +1018,32 @@ function DetailSheet({
       setError(err instanceof Error ? err.message : "Upload gagal");
     } finally {
       setUploadingWo(false);
+    }
+  };
+
+  /** Salin nomor HP customer ke clipboard, dengan fallback untuk webview lama. */
+  const copyPhone = async (phone: string) => {
+    // Digitnya saja (compactPhone) supaya siap tempel ke WA / form ekspedisi.
+    const value = compactPhone(phone);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedPhone(true);
+      onToast("Nomor HP disalin");
+      setTimeout(() => setCopiedPhone(false), 2000);
+    } catch {
+      setCopiedPhone(false);
+      onToast("Gagal menyalin nomor");
     }
   };
 
@@ -1224,10 +1256,28 @@ function DetailSheet({
               <div className="col-span-2 px-4 py-3 border-b border-[var(--pas-line)]">
                 <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Customer</span>
                 <p className="mt-1 text-[14px] font-semibold">{order.customer_name}</p>
-                <p className="text-[12px] text-[var(--pas-muted)] mt-0.5 pas-num">
-                  {order.customer_phone}
-                  {order.customer_city ? ` - ${order.customer_city}` : ""}
-                </p>
+                <div className="mt-0.5 flex items-center gap-2">
+                  {/* Digit saja (compactPhone): nomor siap di-copy-paste ke WA. */}
+                  <p className="text-[12px] text-[var(--pas-muted)] pas-num">
+                    {order.customer_phone ? compactPhone(order.customer_phone) : "No. HP belum diisi"}
+                    {order.customer_city ? ` - ${order.customer_city}` : ""}
+                  </p>
+                  {order.customer_phone ? (
+                    <button
+                      type="button"
+                      onClick={() => copyPhone(order.customer_phone)}
+                      className="pas-btn-ghost inline-grid h-7 w-7 shrink-0 place-items-center"
+                      title={copiedPhone ? "Tersalin" : "Salin nomor HP"}
+                      aria-label="Salin nomor HP customer"
+                    >
+                      {copiedPhone ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                      )}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="px-4 py-3 border-b border-r border-[var(--pas-line)]">
                 <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Tanggal Order</span>

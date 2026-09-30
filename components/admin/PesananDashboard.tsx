@@ -21,6 +21,7 @@ import {
   rememberProducts,
 } from "@/lib/product-options";
 import { waNote } from "@/lib/notif-note";
+import { buildWhatsAppLink, compactPhone } from "@/lib/wa";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Search, AlertTriangle } from "lucide-react";
 
@@ -688,6 +689,7 @@ export default function PesananDashboard({
             setOpenId(null);
             showToast(msg);
           }}
+          onToast={showToast}
           steps={steps}
         />
       )}
@@ -3580,12 +3582,14 @@ function DetailSheet({
   orders,
   onClose,
   onSaved,
+  onToast,
   steps,
 }: {
   orderId: string;
   orders: OrderData[];
   onClose: () => void;
   onSaved: (msg: string) => void;
+  onToast: (msg: string) => void;
   steps: StepRow[];
 }) {
   const order = orders.find((o) => o.id === orderId);
@@ -3609,6 +3613,8 @@ function DetailSheet({
   });
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
+  // Penanda sebentar setelah nomor HP pembeli disalin (ikon berubah centang).
+  const [copiedPhone, setCopiedPhone] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
   const zoomPinchRef = useRef<{ d: number; s: number } | null>(null);
@@ -3658,6 +3664,33 @@ function DetailSheet({
       const result = await uploadToCloudinary(file, { folder: "menara-design-preview" });
       setWoPhotos((prev) => [...prev, optimizeDesignUrl(result.url)]);
     } catch (e) { console.error("[Detail WO] exception", e); setKirimError(e instanceof Error ? e.message : "Upload gagal"); } finally { setUploadingWo(false); }
+  };
+
+  /** Salin nomor HP pembeli ke clipboard, dengan fallback untuk webview lama. */
+  const copyPhone = async (phone: string) => {
+    // Digitnya saja yang disalin — nomor ber-dash cuma bikin ribet saat
+    // ditempel ke WhatsApp / form ekspedisi.
+    const value = compactPhone(phone);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedPhone(true);
+      onToast("Nomor HP disalin");
+      setTimeout(() => setCopiedPhone(false), 2000);
+    } catch {
+      setCopiedPhone(false);
+      onToast("Gagal menyalin nomor");
+    }
   };
 
   if (!order) return null;
@@ -3766,6 +3799,65 @@ function DetailSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pt-5 pb-28" style={{ scrollbarColor: "var(--pas-line) transparent" }}>
+          {/* ── PEMBELI ──
+              Nomor HP ditaruh paling atas (sebelum kartu status) supaya admin
+              bisa langsung menyalin / menghubungi pembeli tanpa membuka menu
+              Customer dulu. Tombol salin menulis digit saja (compactPhone). */}
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-[var(--pas-line)] bg-[var(--pas-surface)] px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)]">
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
+              style={{ background: "rgba(255,229,0,.22)", color: "var(--pas-ink-1)" }}
+              aria-hidden="true"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="pas-stencil text-[9px] text-[var(--pas-muted)]">Pembeli</span>
+              <p className="truncate text-[14px] font-bold leading-tight text-[var(--pas-ink-1)]">{order.customer_name || "(tanpa nama)"}</p>
+              {/* Nomor ditampilkan tanpa dash/spasi (compactPhone) supaya bisa
+                  langsung di-copy-paste ke WA atau form ekspedisi. */}
+              {order.customer_phone ? (
+                <a
+                  href={`tel:${compactPhone(order.customer_phone)}`}
+                  className="pas-num mt-0.5 inline-block text-[12.5px] text-[var(--pas-muted)] transition hover:text-[var(--pas-ink-1)]"
+                  title="Klik untuk menelepon"
+                >
+                  {compactPhone(order.customer_phone)}
+                </a>
+              ) : (
+                <span className="mt-0.5 block text-[12.5px] text-[var(--pas-muted)]">No. HP belum diisi</span>
+              )}
+            </div>
+            {order.customer_phone ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => copyPhone(order.customer_phone)}
+                  className="pas-btn-ghost inline-grid h-9 w-9 shrink-0 place-items-center"
+                  title={copiedPhone ? "Tersalin" : "Salin nomor HP"}
+                  aria-label="Salin nomor HP pembeli"
+                >
+                  {copiedPhone ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                  )}
+                </button>
+                <a
+                  href={buildWhatsAppLink(order.customer_phone, `Halo ${order.customer_name || ""}, `)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="pas-btn-ghost inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-[12px]"
+                  title="Chat WhatsApp pembeli"
+                  aria-label="Chat WhatsApp pembeli"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.5 0 9.96-4.46 9.96-9.96S17.54 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.3-1.95 1.35-.53.05-1.02.24-3.45-.72-2.93-1.15-4.8-4.15-4.94-4.34-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.01-2.41.26-.29.56-.36.75-.36h.54c.17.01.41-.07.64.49.24.56.81 1.98.88 2.12.07.14.12.31.02.5-.1.19-.15.31-.29.48-.14.17-.3.38-.43.51-.14.14-.29.29-.12.57.17.29.75 1.24 1.61 2.01 1.11.99 2.05 1.3 2.34 1.44.29.14.46.12.63-.07.17-.19.73-.85.92-1.14.19-.29.38-.24.64-.14.26.1 1.65.78 1.93.92.29.14.48.22.55.34.07.12.07.68-.17 1.36Z" /></svg>
+                  WhatsApp
+                </a>
+              </>
+            ) : null}
+          </div>
+
           {/* ── STATUS HERO ── */}
           <div className="rounded-2xl border border-[var(--pas-line)] bg-[var(--pas-surface)] shadow-[0_1px_3px_rgba(0,0,0,.04),0_4px_12px_rgba(0,0,0,.04)] p-6 flex flex-col items-center text-center gap-3">
             <div className="w-14 h-14 rounded-full bg-[rgba(17,17,19,.10)] grid place-items-center text-[var(--pas-accent)] text-[22px]">
