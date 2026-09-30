@@ -252,3 +252,47 @@ export async function uploadToCloudinary(
     throw e;
   }
 }
+
+const UPLOAD_MARK = "/upload/";
+
+/**
+ * Sisipkan transformasi penghematan kredit ke URL Cloudinary.
+ *
+ * - `f_auto`  → format paling ringan yang didukung browser (WebP/AVIF)
+ * - `q_auto`  → kualitas otomatis, sekecil mungkin tanpa terlihat jelek
+ * - `w_<n>`   → jangan kirim gambar 1600px untuk thumbnail 280px
+ *
+ * Dipakai halaman status customer supaya daftar tahap tidak mengunduh foto
+ * ukuran penuh, dan supaya lightbox punya versi ringan yang URL-nya sama
+ * persis dengan thumbnail (jadi tampil dari cache, tanpa layar kosong).
+ *
+ * Aman dipanggil berulang dan bisa "menaikkan" URL yang sudah punya
+ * transformasi: `/upload/f_auto,q_auto/…` + `w=320` → `/upload/f_auto,q_auto,w_320/…`.
+ */
+export function optimizeImageUrl(url: string, width?: number): string {
+  if (typeof url !== "string" || !url.includes(UPLOAD_MARK)) return url;
+
+  const at = url.indexOf(UPLOAD_MARK);
+  const before = url.slice(0, at);
+  const segments = url.slice(at + UPLOAD_MARK.length).split("/");
+
+  // Segmen transformasi selalu memakai koma (`f_auto,q_auto`). Cloudinary juga
+  // menerima penulisan tanpa koma, tapi kode ini hanya menghasilkan yang berkoma.
+  const transformAt = segments.findIndex((s) => s.includes(","));
+  const tokens: string[] =
+    transformAt === -1 ? [] : segments[transformAt].split(",").filter(Boolean);
+  if (transformAt !== -1) segments.splice(transformAt, 1);
+
+  const put = (token: string) => {
+    const key = token.split("_")[0];
+    const at = tokens.findIndex((t) => t.split("_")[0] === key);
+    if (at === -1) tokens.push(token);
+    else tokens[at] = token;
+  };
+  put("f_auto");
+  put("q_auto");
+  if (width) put(`w_${width}`);
+
+  const rest = segments.filter(Boolean).join("/");
+  return `${before}${UPLOAD_MARK}${tokens.join(",")}/${rest}`;
+}
